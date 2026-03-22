@@ -57,13 +57,14 @@ behave
 
 3. **Verify locally** – run `behave` and confirm all scenarios pass before opening a pull request.
 
-## Scenario tags (`@fast` / `@slow`)
+## Scenario tags (`@fast` / `@schema` / `@slow`)
 
 Scenarios can be tagged to control execution order and filtering.
 
 | Tag | Meaning | When to use |
 |-----|---------|-------------|
-| `@fast` | Lightweight, no external tooling required | Unit-style checks, trivial pass/fail scenarios |
+| `@fast` | Short-running simulation smoke test; may require KiCad/SPICE toolchain | Quick pass/fail simulation checks |
+| `@schema` | Schema or manifest validation, no external tooling required | Validating JSON Schema, YAML manifests, or file structure |
 | `@slow` | Long-running, requires KiCad/SPICE toolchain | Full simulation or export scenarios |
 
 Tag a scenario by placing the tag on the line immediately above the `Scenario:` keyword:
@@ -71,10 +72,16 @@ Tag a scenario by placing the tag on the line immediately above the `Scenario:` 
 ```gherkin
 Feature: My feature
   @fast
-  Scenario: Quick sanity check
+  Scenario: Quick simulation sanity check
     Given the system is ready
     When nothing happens
     Then the result is as expected
+
+  @schema
+  Scenario: Manifest validation check
+    Given the feature manifest schema is loaded
+    When a valid feature manifest is validated
+    Then validation succeeds
 ```
 
 ### Running tagged scenarios locally
@@ -82,6 +89,9 @@ Feature: My feature
 ```bash
 # Run only fast scenarios
 behave --tags=@fast
+
+# Run only schema scenarios
+behave --tags=@schema
 
 # Run only slow scenarios
 behave --tags=@slow
@@ -92,7 +102,7 @@ behave --tags=~@slow
 
 ### CI tag ordering
 
-The CI pipeline runs `@fast` scenarios in a dedicated step **before** the full suite.  This ensures that fundamental errors are caught quickly, without waiting for long-running simulations to finish.
+The CI pipeline runs `@fast` scenarios in a dedicated step **before** the full suite.  This ensures that fundamental simulation errors are caught quickly, without waiting for long-running simulations to finish.  The `@schema` scenarios also run in this early step so that manifest or schema issues are surfaced immediately.
 
 ## CI integration
 
