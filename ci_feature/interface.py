@@ -120,6 +120,6 @@ def validate_signal_name(signal_name: str, interface: InterfaceContract) -> None
     valid_names = [s["name"] for s in interface.signals]
     if signal_name not in valid_names:
         raise InterfaceValidationError(
-            f"Signal '{signal_name}' is not declared in interface '{interface.name}'. "
+            f"Signal '{signal_name}' is not declared in interface '{interface.name}'.\n"
             f"Valid signals are: {', '.join(valid_names)}"
         )

@@ -108,7 +108,7 @@ The CI pipeline runs `@fast` scenarios in a dedicated step **before** the full s
 
 Scenarios may only reference signals that are declared in the feature's `interface.yml` contract.  Referencing an internal schematic net that is not declared in the interface is a contract violation and must fail **before** any simulation runs.
 
-This rule is enforced by `validate_signal_name(signal_name, interface)` in `ci_feature/interface.py`.  When a signal name is referenced in a step, it is validated against the loaded `InterfaceContract`.  If the name is not present, an `InterfaceValidationError` is raised immediately with a message that includes:
+The helper `validate_signal_name(signal_name, interface)` in `ci_feature/interface.py` is used to enforce this rule.  Step definitions that reference or validate signal names should call this function to check the name against the loaded `InterfaceContract`.  If the name is not present, an `InterfaceValidationError` is raised immediately with a message that includes:
 
 - the **invalid signal name** that was referenced,
 - the **interface/feature name** it was validated against, and
