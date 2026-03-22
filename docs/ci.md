@@ -50,8 +50,8 @@ sorted list of `FeatureManifest` objects.
 2. Any directory that contains a file named `feature.yml` is treated as a feature directory.
 3. Each `feature.yml` is loaded and validated via `load_manifest()` (see
    [Feature manifest](feature-manifest.md)).
-4. The resulting manifests are returned **sorted alphabetically by the absolute path** of each
-   manifest file, guaranteeing a deterministic and repeatable order across CI runs.
+4. The resulting manifests are returned **sorted alphabetically by each manifest's file path**,
+   guaranteeing a deterministic and repeatable order across CI runs.
 
 ### Usage
 
@@ -59,7 +59,7 @@ sorted list of `FeatureManifest` objects.
 from ci_feature.discovery import discover_features
 
 features = discover_features(root_path="/repo")
-# Returns list[FeatureManifest], sorted by their directory path
+# Returns list[FeatureManifest], sorted alphabetically by each manifest's file path
 ```
 
 ### Design decisions

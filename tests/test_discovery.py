@@ -4,11 +4,11 @@ import os
 import textwrap
 
 import pytest
-from hamcrest import assert_that, empty, equal_to, has_length, instance_of
+from hamcrest import assert_that, contains_string, empty, equal_to, has_length, instance_of
 
 import ci_feature.manifest as manifest_module
 from ci_feature.discovery import discover_features
-from ci_feature.manifest import FeatureManifest
+from ci_feature.manifest import FeatureManifest, ManifestValidationError
 
 # Resolved absolute path to the schema file so pyfakefs can expose it.
 _SCHEMA_REAL_PATH = os.path.realpath(manifest_module.SCHEMA_PATH)
@@ -141,6 +141,14 @@ def test_returns_feature_manifest_instances(fake_fs):
     fake_fs.create_file("/repo/feat/feature.yml", contents=VALID_MANIFEST_YAML)
     result = discover_features("/repo")
     assert_that(result[0], instance_of(FeatureManifest))
+
+
+def test_invalid_feature_yml_raises_manifest_validation_error(fake_fs):
+    """discover_features() raises ManifestValidationError for an invalid feature.yml."""
+    fake_fs.create_file("/repo/bad-feature/feature.yml", contents="not_a_manifest: true\n")
+    with pytest.raises(ManifestValidationError) as exc_info:
+        discover_features("/repo")
+    assert_that(str(exc_info.value), contains_string("Manifest validation failed"))
 
 
 def test_result_names_match_manifests(fake_fs):
