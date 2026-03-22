@@ -195,11 +195,17 @@ def step_signal_is_within_tolerance(context, signal, tolerance, expected):
     tol_value, tol_unit = _parse_value_with_unit(tolerance)
     exp_value, exp_unit = _parse_value_with_unit(expected)
 
+    if tol_unit != exp_unit:
+        raise AssertionError(
+            f"Unit mismatch: tolerance unit '{tol_unit}' does not match "
+            f"expected unit '{exp_unit}'. Both must use the same unit."
+        )
+
     lower = exp_value - tol_value
     upper = exp_value + tol_value
 
     if not (lower <= measured <= upper):
         raise AssertionError(
             f"Signal '{signal}': measured {measured} {exp_unit}, "
-            f"expected {exp_value} \u00b1 {tol_value} {exp_unit}"
+            f"expected {exp_value} \u00b1 {tol_value} {tol_unit}"
         )

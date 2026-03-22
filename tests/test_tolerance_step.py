@@ -122,6 +122,58 @@ class TestSignalWithinTolerancePasses:
 
 
 # ---------------------------------------------------------------------------
+# Mismatched units — step fails fast before tolerance comparison
+# ---------------------------------------------------------------------------
+
+
+class TestUnitMismatchFails:
+    """step_signal_is_within_tolerance raises AssertionError when units differ."""
+
+    def test_mismatched_units_raises_assertion_error(self):
+        """Tolerance in A and expected in V raises AssertionError."""
+        context = _make_context(
+            manifest=_make_manifest(),
+            simulation_result=_make_spice_result({"V_OUT": 3.3}),
+        )
+        with patch(
+            "features.steps.feature_steps.load_interface",
+            return_value=_make_interface_contract(),
+        ):
+            with pytest.raises(AssertionError):
+                step_signal_is_within_tolerance(context, "V_OUT", "0.1 A", "3.3 V")
+
+    def test_mismatched_units_error_mentions_tolerance_unit(self):
+        """AssertionError message includes the tolerance unit."""
+        context = _make_context(
+            manifest=_make_manifest(),
+            simulation_result=_make_spice_result({"V_OUT": 3.3}),
+        )
+        with patch(
+            "features.steps.feature_steps.load_interface",
+            return_value=_make_interface_contract(),
+        ):
+            with pytest.raises(AssertionError) as exc_info:
+                step_signal_is_within_tolerance(context, "V_OUT", "0.1 A", "3.3 V")
+
+        assert_that(str(exc_info.value), contains_string("A"))
+
+    def test_mismatched_units_error_mentions_expected_unit(self):
+        """AssertionError message includes the expected unit."""
+        context = _make_context(
+            manifest=_make_manifest(),
+            simulation_result=_make_spice_result({"V_OUT": 3.3}),
+        )
+        with patch(
+            "features.steps.feature_steps.load_interface",
+            return_value=_make_interface_contract(),
+        ):
+            with pytest.raises(AssertionError) as exc_info:
+                step_signal_is_within_tolerance(context, "V_OUT", "0.1 A", "3.3 V")
+
+        assert_that(str(exc_info.value), contains_string("V"))
+
+
+# ---------------------------------------------------------------------------
 # Signal outside tolerance — step fails with detailed message
 # ---------------------------------------------------------------------------
 

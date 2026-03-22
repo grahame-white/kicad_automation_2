@@ -48,7 +48,7 @@ _MEAS_RESULT_RE = re.compile(
 def parse_measure_results(log_content: str) -> Dict[str, float]:
     """Parse ngspice ``.meas`` result lines from simulation log output.
 
-    Scans *log_content* for lines produced by ngspice ```.meas``` directives,
+    Scans *log_content* for lines produced by ngspice ``.meas`` directives,
     which have the form::
 
         <name>   =   <value>
@@ -289,7 +289,7 @@ def run_spice(
 
     signals: Dict[str, float] = {}
     try:
-        with open(log_path) as f:
+        with open(log_path, encoding="utf-8", errors="replace") as f:
             signals = parse_measure_results(f.read())
     except OSError:
         pass
