@@ -37,6 +37,40 @@ ERROR: kicad-cli not found. In CI, this should be provided by the 'Install toolc
 
 and exits with a non-zero status so that the CI job fails immediately rather than producing a cryptic error later.
 
+## Feature discovery
+
+The CI pipeline uses automatic feature discovery — there is no central registry of features.
+The `discover_features(root_path)` function in `ci_feature/discovery.py` recursively scans the
+repository for `feature.yml` files, loads and validates each one, and returns the results as a
+sorted list of `FeatureManifest` objects.
+
+### How it works
+
+1. `os.walk` descends into every subdirectory under `root_path`.
+2. Any directory that contains a file named `feature.yml` is treated as a feature directory.
+3. Each `feature.yml` is loaded and validated via `load_manifest()` (see
+   [Feature manifest](feature-manifest.md)).
+4. The resulting manifests are returned **sorted alphabetically by each manifest's file path**,
+   guaranteeing a deterministic and repeatable order across CI runs.
+
+### Usage
+
+```python
+from ci_feature.discovery import discover_features
+
+features = discover_features(root_path="/repo")
+# Returns list[FeatureManifest], sorted alphabetically by each manifest's file path
+```
+
+### Design decisions
+
+- **No central registry** – adding a new feature only requires creating a `feature.yml` file;
+  no other registration step is needed.
+- **Deterministic order** – results are sorted by path so that CI output is reproducible and
+  easy to compare across runs.
+- **Fail-fast validation** – `load_manifest()` validates each manifest against the JSON Schema
+  during discovery, so malformed manifests are caught immediately.
+
 ## Behavioural test reports
 
 After the **Run BDD scenarios** step completes (whether it passes or fails), the CI pipeline uploads the contents of the `reports/` directory as a downloadable artifact named **`behave-reports`**.
