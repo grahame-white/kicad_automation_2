@@ -7,12 +7,14 @@ from typing import Any, Dict, Optional
 import jsonschema
 import yaml
 
-SCHEMA_PATH = os.path.join(
-    os.path.dirname(__file__),
-    "..",
-    "ci",
-    "schemas",
-    "feature.schema.json",
+SCHEMA_PATH = os.path.realpath(
+    os.path.join(
+        os.path.dirname(__file__),
+        "..",
+        "ci",
+        "schemas",
+        "feature.schema.json",
+    )
 )
 
 
@@ -60,9 +62,7 @@ def load_manifest(path: str) -> FeatureManifest:
         try:
             data = yaml.safe_load(f)
         except yaml.YAMLError as exc:
-            raise ManifestValidationError(
-                f"Failed to parse YAML in {path}: {exc}"
-            ) from exc
+            raise ManifestValidationError(f"Failed to parse YAML in {path}: {exc}") from exc
 
     schema = _load_schema()
 
