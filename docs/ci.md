@@ -21,18 +21,18 @@ The CI pipeline runs on every pull request and on every push to the `main` branc
 
 ## Toolchain requirements
 
-The CI pipeline requires the following tools to be present on the runner. A dedicated **Check toolchain presence** step verifies each tool before any other work begins and fails with an explicit, actionable message if a tool is missing.
+The CI pipeline requires the following tools to be present on the runner. A dedicated **Check toolchain presence** step verifies each tool before any other work begins and fails with an explicit, actionable message if a tool is missing. The table below documents the versions and sources that CI currently uses.
 
-| Tool | Purpose | Install reference |
-|------|---------|-------------------|
-| `kicad-cli` | Schematic and PCB export / DRC | <https://www.kicad.org/download/> |
-| `ngspice` | SPICE simulation | <https://ngspice.sourceforge.io/> |
-| `python` | BDD step definitions and automation scripts | <https://www.python.org/downloads/> |
+| Tool | Purpose | Tested version / source | Install reference |
+|------|---------|-------------------------|-------------------|
+| `kicad-cli` | Schematic and PCB export / DRC | Version from `ubuntu-latest` runner image (apt package `kicad`) | <https://www.kicad.org/download/> |
+| `ngspice` | SPICE simulation | Version from `ubuntu-latest` runner image (apt package `ngspice`) | <https://ngspice.sourceforge.io/> |
+| `python` | BDD step definitions and automation scripts | 3.12.x (via `actions/setup-python` in CI) | <https://www.python.org/downloads/> |
 
 If a tool is missing the step prints a message such as:
 
 ```
-ERROR: kicad-cli not found. Please install KiCad (https://www.kicad.org/download/).
+ERROR: kicad-cli not found. In CI, this should be provided by the 'Install toolchain' step (apt package 'kicad') or the runner image. Please update that step or the image.
 ```
 
 and exits with a non-zero status so that the CI job fails immediately rather than producing a cryptic error later.

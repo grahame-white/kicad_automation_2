@@ -32,15 +32,15 @@ jobs:
       - name: Check toolchain presence
         run: |
           command -v kicad-cli \
-            || { echo "ERROR: kicad-cli not found. Please install KiCad (https://www.kicad.org/download/)."; exit 1; }
+            || { echo "ERROR: kicad-cli not found. In CI, this should be provided by the 'Install toolchain' step (apt package 'kicad') or the runner image. Please update that step or the image."; exit 1; }
           kicad-cli --version
 
           command -v ngspice \
-            || { echo "ERROR: ngspice not found. Please install ngspice (https://ngspice.sourceforge.io/)."; exit 1; }
+            || { echo "ERROR: ngspice not found. In CI, this should be provided by the 'Install toolchain' step (apt package 'ngspice') or the runner image. Please update that step or the image."; exit 1; }
           ngspice --version
 
           command -v python \
-            || { echo "ERROR: python not found. Please install Python 3 (https://www.python.org/downloads/)."; exit 1; }
+            || { echo "ERROR: python not found. In CI, this should be provided by the 'Set up Python' step or the runner image. Please update that step or the image."; exit 1; }
           python --version
 
       - name: Install dependencies
