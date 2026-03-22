@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/grahame-white/kicad_automation_2/ci/schemas/interface.schema.json",
+  "title": "Interface Contract",
+  "description": "Reusable interface contract schema for describing interface signals.",
+  "type": "object",
+  "required": ["name", "version", "signals"],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Interface identifier.",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "description": "Semantic version of the interface contract.",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?$"
+    },
+    "signals": {
+      "type": "array",
+      "description": "List of signal definitions.",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["name", "direction", "domain", "unit", "description"],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Signal name (used in GWT scenarios).",
+            "minLength": 1
+          },
+          "direction": {
+            "type": "string",
+            "description": "Signal direction.",
+            "enum": ["input", "output", "bidirectional"]
+          },
+          "domain": {
+            "type": "string",
+            "description": "Signal domain.",
+            "enum": ["analog", "digital"]
+          },
+          "unit": {
+            "type": "string",
+            "description": "SI unit string (e.g., V, A, Hz).",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string",
+            "description": "Human-readable description of the signal.",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}
