@@ -57,13 +57,13 @@ jobs:
             exit "${exit_code}"
           fi
 
-      # Run @fast-tagged scenarios first for quick fail-fast feedback.
+      # Run @fast- and @schema-tagged scenarios first for quick fail-fast feedback.
       # continue-on-error ensures the full suite still runs (and the HTML report
       # is always produced), while the final check step re-fails the job if needed.
       - name: Run fast BDD scenarios
         id: fast_bdd
         continue-on-error: true
-        run: behave --tags=@fast
+        run: behave --tags=@fast,@schema
 
       # Run the full suite (including @fast scenarios) for complete HTML reporting.
       - name: Run BDD scenarios
