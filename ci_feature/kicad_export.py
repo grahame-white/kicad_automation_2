@@ -5,6 +5,7 @@ import shlex
 import subprocess
 
 from ci_feature.manifest import FeatureManifest
+from ci_feature.netlist import normalize_netlist
 
 __all__ = [
     "NetlistExportError",
@@ -109,5 +110,17 @@ def export_netlist(manifest: FeatureManifest, output_dir: str, feature_dir: str 
             f"kicad-cli produced an empty netlist file for feature '{manifest.name}': "
             f"{netlist_path}"
         )
+
+    try:
+        normalize_netlist(netlist_path, netlist_path)
+    except NetlistExportError:
+        # Preserve any explicit NetlistExportError raised by normalize_netlist.
+        raise
+    except Exception as exc:
+        # Wrap unexpected errors to keep the export_netlist API contract.
+        raise NetlistExportError(
+            f"Failed to normalize netlist for feature '{manifest.name}' at '{netlist_path}'. "
+            f"Original error: {exc.__class__.__name__}: {exc}"
+        ) from exc
 
     return netlist_path
