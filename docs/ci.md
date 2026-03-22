@@ -105,7 +105,9 @@ pairs = discover_scenarios(root_path="/repo")
 - **No central registry** – adding a scenario only requires creating a ``*.feature`` file
   inside the relevant feature directory; no other registration step is needed.
 - **Composable** – `discover_scenarios` delegates feature discovery to `discover_features`,
-  so isolation, validation, and pruning rules are inherited automatically.
+  so isolation and validation behaviour are shared. The directory-pruning rules (e.g. `.git`,
+  `__pycache__`, `.venv`) are defined once in `ci_feature.discovery` and reused by both
+  passes, eliminating the risk of the two drifting apart.
 
 ## Netlist artefacts
 

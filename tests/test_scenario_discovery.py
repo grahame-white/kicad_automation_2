@@ -199,6 +199,43 @@ def test_ordering_is_invariant_across_repeated_calls(fake_fs):
     )
 
 
+def test_nested_feature_directory_scenarios_are_not_attributed_to_parent(fake_fs):
+    """Scenarios in nested feature directories are attributed to their own manifest.
+
+    When a feature directory contains a subdirectory that is itself a feature
+    (i.e. it has its own ``feature.yml``), scenario discovery must not walk
+    into that subdirectory while processing the parent feature.  Each set of
+    scenarios should be paired only with the manifest that owns them.
+    """
+    # Parent feature.
+    fake_fs.create_file("/repo/features/parent/feature.yml", contents=VALID_MANIFEST_YAML)
+    fake_fs.create_file("/repo/features/parent/interface.yml", contents=VALID_INTERFACE_YAML)
+    fake_fs.create_file(
+        "/repo/features/parent/parent.feature",
+        contents="Feature: Parent Scenario\n",
+    )
+
+    # Nested feature inside the parent feature directory.
+    fake_fs.create_file("/repo/features/parent/nested/feature.yml", contents=VALID_MANIFEST_YAML_2)
+    fake_fs.create_file("/repo/features/parent/nested/interface.yml", contents=VALID_INTERFACE_YAML)
+    fake_fs.create_file(
+        "/repo/features/parent/nested/child.feature",
+        contents="Feature: Child Scenario\n",
+    )
+
+    result = discover_scenarios("/repo")
+
+    # Ensure that the scenarios are associated with the correct manifests.
+    name_pairs = sorted((manifest.name, path.name) for manifest, path in result)
+    expected = sorted(
+        [
+            ("voltage-regulator", "parent.feature"),
+            ("current-sensor", "child.feature"),
+        ]
+    )
+    assert_that(name_pairs, equal_to(expected))
+
+
 def test_each_pair_contains_feature_manifest_and_path(fake_fs):
     """discover_scenarios() returns (FeatureManifest, Path) tuples."""
     from pathlib import Path

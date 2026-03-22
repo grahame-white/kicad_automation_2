@@ -5,11 +5,11 @@ from typing import List
 
 from ci_feature.manifest import FeatureManifest, load_manifest
 
-_FEATURE_MANIFEST_FILENAME = "feature.yml"
+FEATURE_MANIFEST_FILENAME = "feature.yml"
 
 # Directories that are never source directories and should be skipped during
 # discovery to avoid unnecessary I/O (e.g. .git/objects can be very large).
-_PRUNE_DIRS = frozenset(
+PRUNE_DIRS = frozenset(
     {
         ".git",
         "__pycache__",
@@ -47,9 +47,9 @@ def discover_features(root_path: str) -> List[FeatureManifest]:
     manifest_paths: List[str] = []
 
     for dirpath, dirnames, filenames in os.walk(root_path):
-        dirnames[:] = sorted(d for d in dirnames if d not in _PRUNE_DIRS)
-        if _FEATURE_MANIFEST_FILENAME in filenames:
-            manifest_paths.append(os.path.join(dirpath, _FEATURE_MANIFEST_FILENAME))
+        dirnames[:] = sorted(d for d in dirnames if d not in PRUNE_DIRS)
+        if FEATURE_MANIFEST_FILENAME in filenames:
+            manifest_paths.append(os.path.join(dirpath, FEATURE_MANIFEST_FILENAME))
 
     manifest_paths.sort()
 
