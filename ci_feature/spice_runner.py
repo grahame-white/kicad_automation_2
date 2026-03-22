@@ -80,11 +80,18 @@ def run_spice(netlist_path: str, output_dir: str, timeout: int = 60) -> SpiceRes
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
     except (FileNotFoundError, OSError, subprocess.TimeoutExpired) as exc:
-        raise SpiceRunError(
+        message = (
             f"Failed to run ngspice.\n"
             f"Command: {shlex.join(cmd)}\n"
             f"Original error: {exc.__class__.__name__}: {exc}"
-        ) from exc
+        )
+        if isinstance(exc, subprocess.TimeoutExpired):
+            # subprocess.TimeoutExpired may contain partial output/stderr when capture_output=True.
+            if getattr(exc, "output", None):
+                message += f"\nPartial stdout: {exc.output}"
+            if getattr(exc, "stderr", None):
+                message += f"\nPartial stderr: {exc.stderr}"
+        raise SpiceRunError(message) from exc
 
     if result.returncode != 0:
         raise SpiceRunError(

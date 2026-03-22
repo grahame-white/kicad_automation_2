@@ -333,6 +333,30 @@ def test_run_spice_raises_spice_run_error_on_timeout(fs):
     assert_that(str(exc_info.value), contains_string("ngspice"))
 
 
+def test_run_spice_timeout_includes_partial_stdout(fs):
+    """SpiceRunError for timeout includes partial stdout when available."""
+    fs.create_file(_NETLIST_PATH, contents="* netlist\n.end\n")
+    exc = subprocess.TimeoutExpired(cmd=["ngspice"], timeout=30, output="partial output text")
+
+    with patch("ci_feature.spice_runner.subprocess.run", side_effect=exc):
+        with pytest.raises(SpiceRunError) as exc_info:
+            run_spice(_NETLIST_PATH, _OUTPUT_DIR)
+
+    assert_that(str(exc_info.value), contains_string("partial output text"))
+
+
+def test_run_spice_timeout_includes_partial_stderr(fs):
+    """SpiceRunError for timeout includes partial stderr when available."""
+    fs.create_file(_NETLIST_PATH, contents="* netlist\n.end\n")
+    exc = subprocess.TimeoutExpired(cmd=["ngspice"], timeout=30, stderr="partial stderr text")
+
+    with patch("ci_feature.spice_runner.subprocess.run", side_effect=exc):
+        with pytest.raises(SpiceRunError) as exc_info:
+            run_spice(_NETLIST_PATH, _OUTPUT_DIR)
+
+    assert_that(str(exc_info.value), contains_string("partial stderr text"))
+
+
 # ---------------------------------------------------------------------------
 # Integration test — skipped when ngspice is not installed
 # ---------------------------------------------------------------------------

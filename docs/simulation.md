@@ -76,8 +76,10 @@ Raised when:
 - `ngspice` exits with a non-zero status code.
 - `ngspice` does not complete within the *timeout* seconds.
 
-The exception message always includes the attempted command and any captured
-stdout/stderr so failures are immediately actionable.
+The exception message always includes the attempted command and, when
+available, any captured stdout/stderr so failures are immediately actionable.
+(For example, launch failures may have no captured output, and timeouts may
+omit partial output.)
 
 ## Output Structure
 
