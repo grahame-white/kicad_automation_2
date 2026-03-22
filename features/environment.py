@@ -9,5 +9,10 @@ def before_scenario(context, scenario):
     Sets ``context.feature_root`` to the repository root so that step
     definitions can call ``discover_features(context.feature_root)`` without
     needing to know the repository layout themselves.
+
+    Resets ``context.feature_manifest`` to ``None`` so that a scenario that
+    forgets to call ``Given the feature ...`` does not accidentally inherit the
+    manifest loaded by a previous scenario.
     """
     context.feature_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    context.feature_manifest = None
