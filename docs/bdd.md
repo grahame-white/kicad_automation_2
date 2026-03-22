@@ -59,4 +59,4 @@ behave
 
 ## CI integration
 
-The CI pipeline runs `behave` automatically on every pull request and push to `main`.  See [ci.md](ci.md) for the full pipeline description.
+The CI pipeline runs `behave` automatically on every pull request and push to `main`.  See [ci.md](ci.md) for details of the rest of the CI pipeline (currently focused on the pytest-based tests).
