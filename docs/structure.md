@@ -1,6 +1,6 @@
 # Repository Structure
 
-This document describes the purpose of each top-level directory in this repository.
+This document describes the purpose of each top-level directory and notable subdirectories in this repository.
 
 ## `features/`
 
