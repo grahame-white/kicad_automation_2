@@ -344,6 +344,6 @@ def test_run_spice_with_real_fixture():
     with tempfile.TemporaryDirectory() as output_dir:
         result = run_spice(_FIXTURE_NETLIST, output_dir)
 
-    assert_that(result, instance_of(SpiceResult))
-    assert_that(result.returncode, equal_to(0))
-    assert_that(os.path.isfile(result.log_path), equal_to(True))
+        assert_that(result, instance_of(SpiceResult))
+        assert_that(result.returncode, equal_to(0))
+        assert_that(os.path.isfile(result.log_path), equal_to(True))
