@@ -71,6 +71,44 @@ features = discover_features(root_path="/repo")
 - **Fail-fast validation** – `load_manifest()` validates each manifest against the JSON Schema
   during discovery, so malformed manifests are caught immediately.
 
+## Scenario discovery and ordering
+
+The CI pipeline pairs each feature manifest with its associated ``*.feature`` scenario files
+using automatic scenario discovery — there is no central registry of scenarios.
+The `discover_scenarios(root_path)` function in `ci_feature/scenario_discovery.py` builds on
+`discover_features()` by scanning each feature's directory for ``*.feature`` files and returning
+a sorted list of ``(FeatureManifest, Path)`` pairs.
+
+### How it works
+
+1. `discover_features(root_path)` is called to locate all feature manifests (see
+   [Feature discovery](#feature-discovery) above).
+2. For each discovered manifest, every ``*.feature`` file within that feature's directory
+   subtree is found via `os.walk`.
+3. The resulting ``(manifest, scenario_path)`` pairs are returned **sorted by
+   ``(feature directory, scenario file path)``**, guaranteeing a deterministic and repeatable
+   order across CI runs.
+
+### Usage
+
+```python
+from ci_feature.scenario_discovery import discover_scenarios
+
+pairs = discover_scenarios(root_path="/repo")
+# Returns: [(FeatureManifest, Path), ...] sorted by (feature_dir, scenario_file)
+```
+
+### Design decisions
+
+- **Deterministic order** – results are sorted by ``(feature directory, scenario file path)``
+  so that batching and parallelism decisions are stable and reproducible across CI runs.
+- **No central registry** – adding a scenario only requires creating a ``*.feature`` file
+  inside the relevant feature directory; no other registration step is needed.
+- **Composable** – `discover_scenarios` delegates feature discovery to `discover_features`,
+  so isolation and validation behaviour are shared. The directory-pruning rules (e.g. `.git`,
+  `__pycache__`, `.venv`) are defined once in `ci_feature.discovery` and reused by both
+  passes, eliminating the risk of the two drifting apart.
+
 ## Netlist artefacts
 
 The CI pipeline exports a KiCad netlist for each feature's schematic using
