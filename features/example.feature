@@ -1,4 +1,5 @@
 Feature: Example
+  @fast
   Scenario: Trivial pass
     Given the system is ready
     When nothing happens

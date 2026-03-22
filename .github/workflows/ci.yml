@@ -57,6 +57,11 @@ jobs:
             exit "${exit_code}"
           fi
 
+      # Run @fast-tagged scenarios first for quick fail-fast feedback.
+      - name: Run fast BDD scenarios
+        run: behave --tags=@fast
+
+      # Run the full suite (including @fast scenarios) for complete HTML reporting.
       - name: Run BDD scenarios
         run: behave -f behave_html_formatter:HTMLFormatter -o reports/behave-report.html
 
