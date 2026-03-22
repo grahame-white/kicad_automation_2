@@ -18,10 +18,10 @@ tools:
     min-integrity: none
 safe-outputs:
   create-issue:
-    expires: 2d
+    expires: 10d
     title-prefix: "[plan] "
     labels: [plan, ai-generated, cookie]
-    max: 5  # Maximum 5 sub-issues per group
+    max: 50  # Maximum 50 sub-issues per group
     group: true
   close-discussion:
     required-category: "Ideas"
@@ -46,7 +46,7 @@ ${{ steps.sanitized.outputs.text }}
 
 ## Your Mission
 
-Analyze the issue or discussion along with the comment content (which may contain additional guidance from the user), then create actionable sub-issues (at most 5) that can be assigned to GitHub Copilot coding agent.
+Analyze the issue or discussion along with the comment content (which may contain additional guidance from the user), then create actionable sub-issues (at most 50) that can be assigned to GitHub Copilot coding agent.
 
 **Important**: With issue grouping enabled, all issues you create will be automatically grouped under a parent tracking issue. You don't need to create a parent issue manually or use temporary IDs - just create the sub-issues directly.
 
@@ -60,7 +60,7 @@ Analyze the issue or discussion along with the comment content (which may contai
 
 ## Creating Sub-Issues
 
-Create actionable sub-issues (at most 5) with the following format:
+Create actionable sub-issues (at most 50) with the following format:
 - Each sub-issue should be a clear, actionable task for a SWE agent
 - Use the `create_issue` type with `title` and `body` fields
 - Do NOT use the `parent` field - grouping is automatic
@@ -81,10 +81,14 @@ Order the tasks logically:
 - Follow with implementation tasks
 - End with validation and documentation
 - Consider dependencies between tasks
+- Append a sequence marker `(xx / yy)` to each related issue title, where
+  - xx is the position of the task within the sequence
+  - yy is the total number of issues in that sequence
 
 ### 3. Right Level of Granularity
 Each task should:
 - Be completable in a single PR
+- Coding agents time out after 15 minutes, create tasks that take 10 minutes to complete. 
 - Not be too large (avoid epic-sized tasks)
 - With a single focus or goal. Keep them extremely small and focused even it means more tasks.
 - Have clear acceptance criteria
@@ -112,7 +116,7 @@ All created issues will be automatically grouped under a parent tracking issue.
 
 ## Important Notes
 
-- **Maximum 5 sub-issues**: Don't create more than 5 sub-issues
+- **Maximum 50 sub-issues**: Don't create more than 50 sub-issues
 - **No Parent Field**: Don't use the `parent` field - grouping is automatic
 - **No Temporary IDs**: Don't use temporary IDs - grouping handles parent creation automatically
 - **User Guidance**: Pay attention to the comment content above - the user may have provided specific instructions or priorities
@@ -128,12 +132,12 @@ Review instructions in `.github/instructions/*.instructions.md` if you need guid
 
 {{#if github.event.issue.number}}
 1. First, analyze the current issue (#${{ github.event.issue.number }}) and the user's comment for context and any additional guidance
-2. Create sub-issues (at most 5) - they will be automatically grouped
+2. Create sub-issues (at most 50) - they will be automatically grouped
 {{/if}}
 
 {{#if github.event.discussion.number}}
 1. First, analyze the discussion (#${{ github.event.discussion.number }}) and the user's comment for context and any additional guidance
-2. Create sub-issues (at most 5) - they will be automatically grouped
+2. Create sub-issues (at most 50) - they will be automatically grouped
 3. After creating all issues successfully, if this was triggered from a discussion in the "Ideas" category, close the discussion with a comment summarizing the plan and resolution reason "RESOLVED"
 {{/if}}
 

@@ -24,7 +24,7 @@
 #
 # Source: github/gh-aw/.github/workflows/plan.md@48d8fdfddc8cad854ac0c70ceb573f09fb8f9c9b
 #
-# gh-aw-metadata: {"schema_version":"v3","frontmatter_hash":"36a48ef479828a98cc382b55c91002a5f6e2ea3b5dee81145b523e84166a94d3","compiler_version":"v0.62.5","strict":true,"agent_id":"copilot"}
+# gh-aw-metadata: {"schema_version":"v3","frontmatter_hash":"61ec76de8117d4d5fb447d7f9861592cd7f136b4929ba1bd9a92cc04f4ac18fe","compiler_version":"v0.62.5","strict":true,"agent_id":"copilot"}
 
 name: "Plan Command"
 "on":
@@ -379,7 +379,7 @@ jobs:
           mkdir -p /tmp/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
           cat > ${RUNNER_TEMP}/gh-aw/safeoutputs/config.json << 'GH_AW_SAFE_OUTPUTS_CONFIG_EOF'
-          {"close_discussion":{"max":1,"required_category":"Ideas"},"create_issue":{"expires":48,"group":true,"max":5},"missing_data":{},"missing_tool":{},"noop":{"max":1}}
+          {"close_discussion":{"max":1,"required_category":"Ideas"},"create_issue":{"expires":240,"group":true,"max":50},"missing_data":{},"missing_tool":{},"noop":{"max":1}}
           GH_AW_SAFE_OUTPUTS_CONFIG_EOF
       - name: Write Safe Outputs Tools
         run: |
@@ -387,7 +387,7 @@ jobs:
           {
             "description_suffixes": {
               "close_discussion": " CONSTRAINTS: Maximum 1 discussion(s) can be closed.",
-              "create_issue": " CONSTRAINTS: Maximum 5 issue(s) can be created. Title will be prefixed with \"[plan] \". Labels [\"plan\" \"ai-generated\" \"cookie\"] will be automatically added."
+              "create_issue": " CONSTRAINTS: Maximum 50 issue(s) can be created. Title will be prefixed with \"[plan] \". Labels [\"plan\" \"ai-generated\" \"cookie\"] will be automatically added."
             },
             "repo_params": {},
             "dynamic_tools": []
@@ -1145,7 +1145,7 @@ jobs:
           GH_AW_ALLOWED_DOMAINS: "api.business.githubcopilot.com,api.enterprise.githubcopilot.com,api.github.com,api.githubcopilot.com,api.individual.githubcopilot.com,api.snapcraft.io,archive.ubuntu.com,azure.archive.ubuntu.com,crl.geotrust.com,crl.globalsign.com,crl.identrust.com,crl.sectigo.com,crl.thawte.com,crl.usertrust.com,crl.verisign.com,crl3.digicert.com,crl4.digicert.com,crls.ssl.com,github.com,host.docker.internal,json-schema.org,json.schemastore.org,keyserver.ubuntu.com,ocsp.digicert.com,ocsp.geotrust.com,ocsp.globalsign.com,ocsp.identrust.com,ocsp.sectigo.com,ocsp.ssl.com,ocsp.thawte.com,ocsp.usertrust.com,ocsp.verisign.com,packagecloud.io,packages.cloud.google.com,packages.microsoft.com,ppa.launchpad.net,raw.githubusercontent.com,registry.npmjs.org,s.symcb.com,s.symcd.com,security.ubuntu.com,telemetry.enterprise.githubcopilot.com,ts-crl.ws.symantec.com,ts-ocsp.ws.symantec.com,www.googleapis.com"
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_API_URL: ${{ github.api_url }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"close_discussion\":{\"max\":1},\"create_issue\":{\"expires\":48,\"group\":true,\"labels\":[\"plan\",\"ai-generated\",\"cookie\"],\"max\":5,\"title_prefix\":\"[plan] \"},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":1,\"report-as-issue\":\"true\"}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"close_discussion\":{\"max\":1},\"create_issue\":{\"expires\":240,\"group\":true,\"labels\":[\"plan\",\"ai-generated\",\"cookie\"],\"max\":50,\"title_prefix\":\"[plan] \"},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":1,\"report-as-issue\":\"true\"}}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
