@@ -98,6 +98,9 @@ jobs:
 
   full-suite:
     needs: fast-check
+    # Only run the serial full-suite (HTML report) on pushes to main.
+    # PRs use the matrix sharding jobs (run-feature) for parallel per-feature coverage.
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: read
