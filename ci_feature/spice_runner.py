@@ -6,12 +6,13 @@ import os
 import shlex
 import subprocess
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 from ci_feature.model_validation import validate_model_presence
 from ci_feature.spice_errors import (
     ConvergenceError,
     MissingModelError,
+    MissingParameterError,
     SpiceRunError,
     SpiceSyntaxError,
 )
@@ -22,11 +23,13 @@ if TYPE_CHECKING:
 __all__ = [
     "ConvergenceError",
     "MissingModelError",
+    "MissingParameterError",
     "SpiceRunError",
     "SpiceSyntaxError",
     "SpiceResult",
     "run_spice",
     "validate_model_presence",
+    "validate_required_parameters",
 ]
 
 
@@ -45,6 +48,45 @@ class SpiceResult:
     stdout: str
     stderr: str
     log_path: str
+
+
+def validate_required_parameters(
+    manifest: FeatureManifest, provided_params: Optional[Dict[str, Any]]
+) -> None:
+    """Check that all required SPICE model parameters are present in *provided_params*.
+
+    Compares the parameter names listed in ``manifest.models["required_parameters"]``
+    against the keys of *provided_params* and raises :class:`MissingParameterError` if
+    any required names are absent.  This function is intended to be called as a
+    pre-flight check before invoking ngspice, so that CI fails fast with a clear
+    error rather than producing a misleading ngspice simulation failure.
+
+    Extra parameters that are present in *provided_params* but not listed in
+    ``manifest.models["required_parameters"]`` are silently accepted.
+
+    Args:
+        manifest: A :class:`~ci_feature.manifest.FeatureManifest` instance whose
+            ``models["required_parameters"]`` list will be verified.
+        provided_params: A mapping of parameter names to values supplied by the
+            scenario.  ``None`` or an empty dict is treated as no parameters
+            provided.
+
+    Raises:
+        MissingParameterError: If one or more required parameters are absent from
+            *provided_params*.  The error message includes the feature name and the
+            full list of missing parameter names.
+    """
+    required = list(dict.fromkeys(manifest.models.get("required_parameters", [])))
+    provided = set(provided_params.keys()) if provided_params else set()
+    missing = [p for p in required if p not in provided]
+
+    if missing:
+        missing_list = "\n".join(f"  {p}" for p in missing)
+        raise MissingParameterError(
+            f"Feature '{manifest.name}' is missing "
+            f"{len(missing)} required {'parameter' if len(missing) == 1 else 'parameters'}:\n"
+            f"{missing_list}"
+        )
 
 
 def _raise_classified_error(returncode: int, stdout: str, stderr: str, cmd: list[str]) -> None:
@@ -89,6 +131,7 @@ def run_spice(
     timeout: int = 60,
     manifest: Optional[FeatureManifest] = None,
     feature_dir: Optional[str] = None,
+    provided_params: Optional[Dict[str, Any]] = None,
 ) -> SpiceResult:
     """Run ngspice on *netlist_path* and capture all output.
 
@@ -102,6 +145,11 @@ def run_spice(
     is raised immediately — before the subprocess starts — so CI fails fast
     with a clear, actionable error.
 
+    When *manifest* is provided and ``manifest.models["required_parameters"]``
+    is non-empty, every listed parameter name is verified to be present in
+    *provided_params*.  If any are absent, :class:`MissingParameterError` is
+    raised before ngspice is invoked.
+
     Args:
         netlist_path: Path to the SPICE netlist file to simulate.
         output_dir: Directory where the simulation log will be written.  The
@@ -110,11 +158,17 @@ def run_spice(
             Defaults to 60.  Raises :class:`SpiceRunError` if the process does
             not finish within this time.
         manifest: Optional :class:`~ci_feature.manifest.FeatureManifest`
-            whose ``models["libraries"]`` paths are checked for existence before
-            ngspice is invoked.  Must be supplied together with *feature_dir*.
+            whose ``models["libraries"]`` paths are checked for existence and
+            whose ``models["required_parameters"]`` are validated against
+            *provided_params* before ngspice is invoked.  Must be supplied
+            together with *feature_dir*.
         feature_dir: Directory containing the ``feature.yml`` file; used to
             resolve model library paths from *manifest* to absolute paths.
             Required when *manifest* is provided.
+        provided_params: Mapping of parameter names to values supplied by the
+            scenario.  Validated against ``manifest.models["required_parameters"]``
+            when *manifest* is provided.  ``None`` is treated as no parameters
+            provided.
 
     Returns:
         A :class:`SpiceResult` containing the exit code, captured stdout,
@@ -125,6 +179,9 @@ def run_spice(
         MissingModelError: If *manifest* is supplied and one or more model
             library files listed in ``manifest.models["libraries"]`` do not
             exist on the filesystem (raised before ngspice is invoked).
+        MissingParameterError: If *manifest* is supplied and one or more names
+            listed in ``manifest.models["required_parameters"]`` are absent from
+            *provided_params* (raised before ngspice is invoked).
         SpiceRunError: If ``ngspice`` cannot be launched (e.g. not installed);
             if ``ngspice`` does not complete within *timeout* seconds; if
             *netlist_path* does not exist; or if ``ngspice`` exits with a
@@ -142,6 +199,7 @@ def run_spice(
         if feature_dir is None:
             raise ValueError("feature_dir must be provided when manifest is provided")
         validate_model_presence(manifest, feature_dir)
+        validate_required_parameters(manifest, provided_params)
 
     netlist_path = os.path.realpath(netlist_path)
     output_dir = os.path.realpath(output_dir)

@@ -160,6 +160,75 @@ Feature '<name>' is missing <n> model file[s]:
   /absolute/path/to/second/missing.spice
 ```
 
+## Required parameterisation
+
+Every parameter name listed in `models.required_parameters` must be supplied by
+the scenario before ngspice runs.  This ensures that simulation failures caused
+by missing substitution values are caught early — before the ngspice subprocess
+is launched — with a clear, actionable error.
+
+### Behaviour
+
+- All names in `models.required_parameters` are compared against the keys of the
+  `provided_params` mapping passed to `run_spice()` or `validate_required_parameters()`.
+- If every required name is present in `provided_params`, validation passes silently.
+- Extra parameters that are present in `provided_params` but not listed in
+  `models.required_parameters` are silently accepted.
+- If one or more required names are absent, a `MissingParameterError` is raised
+  **before** ngspice is started.  The error message includes:
+  - The feature name.
+  - Every missing parameter name.
+
+### Enforcement via `run_spice()`
+
+Pass the parameter mapping via the `provided_params` keyword argument:
+
+```python
+from ci_feature.manifest import load_manifest
+from ci_feature.spice_runner import run_spice
+from ci_feature.spice_errors import MissingParameterError
+import os
+
+manifest = load_manifest("path/to/feature.yml")
+feature_dir = os.path.dirname(os.path.realpath("path/to/feature.yml"))
+
+# validate_required_parameters is called automatically before ngspice starts
+result = run_spice(
+    "path/to/netlist.spice",
+    "path/to/output",
+    manifest=manifest,
+    feature_dir=feature_dir,
+    provided_params={"V_IN": 5.0, "V_OUT": 3.3},
+)
+```
+
+### Standalone enforcement
+
+`validate_required_parameters()` can also be called directly:
+
+```python
+from ci_feature.manifest import load_manifest
+from ci_feature.spice_runner import validate_required_parameters
+from ci_feature.spice_errors import MissingParameterError
+
+manifest = load_manifest("path/to/feature.yml")
+
+try:
+    validate_required_parameters(manifest, {"V_IN": 5.0, "V_OUT": 3.3})
+except MissingParameterError as exc:
+    print(f"Pre-flight check failed: {exc}")
+```
+
+### Error format
+
+When required parameters are missing, the error message follows this pattern:
+
+```
+Feature '<name>' is missing <n> required parameter[s]:
+  PARAM_ONE
+  PARAM_TWO
+```
+
 ## Low-level validation
 
 You can also validate a manifest dict directly against the JSON Schema at

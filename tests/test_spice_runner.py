@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from hamcrest import assert_that, contains_string, equal_to, instance_of
 
-from ci_feature.spice_errors import MissingModelError
+from ci_feature.spice_errors import MissingModelError, MissingParameterError
 from ci_feature.spice_runner import SpiceResult, SpiceRunError, run_spice
 
 _NETLIST_PATH = "/tmp/ci/fixtures/minimal.spice"
@@ -468,6 +468,118 @@ def test_run_spice_raises_value_error_when_manifest_provided_without_feature_dir
 
     with pytest.raises(ValueError, match="feature_dir"):
         run_spice(_NETLIST_PATH, _OUTPUT_DIR, manifest=manifest)
+
+
+# ---------------------------------------------------------------------------
+# Pre-flight required-parameter check via provided_params
+# ---------------------------------------------------------------------------
+
+
+def test_run_spice_raises_missing_parameter_error_when_required_param_absent(fs):
+    """run_spice() raises MissingParameterError when a required parameter is not provided."""
+    fs.create_file(_NETLIST_PATH, contents="* netlist\n.end\n")
+    fs.create_dir(_FEATURE_DIR)
+    manifest = _FakeManifest(
+        name="voltage-regulator",
+        models={"libraries": [], "required_parameters": ["V_IN"]},
+    )
+
+    with pytest.raises(MissingParameterError):
+        run_spice(
+            _NETLIST_PATH,
+            _OUTPUT_DIR,
+            manifest=manifest,
+            feature_dir=_FEATURE_DIR,
+            provided_params={},
+        )
+
+
+def test_run_spice_raises_missing_parameter_error_before_subprocess(fs):
+    """run_spice() raises MissingParameterError without calling subprocess when params missing."""
+    fs.create_file(_NETLIST_PATH, contents="* netlist\n.end\n")
+    fs.create_dir(_FEATURE_DIR)
+    manifest = _FakeManifest(
+        name="voltage-regulator",
+        models={"libraries": [], "required_parameters": ["V_IN"]},
+    )
+
+    with patch("ci_feature.spice_runner.subprocess.run") as mock_run:
+        with pytest.raises(MissingParameterError):
+            run_spice(
+                _NETLIST_PATH,
+                _OUTPUT_DIR,
+                manifest=manifest,
+                feature_dir=_FEATURE_DIR,
+                provided_params={},
+            )
+
+    mock_run.assert_not_called()
+
+
+def test_run_spice_missing_parameter_error_includes_feature_name(fs):
+    """MissingParameterError from run_spice pre-flight includes the feature name."""
+    fs.create_file(_NETLIST_PATH, contents="* netlist\n.end\n")
+    fs.create_dir(_FEATURE_DIR)
+    manifest = _FakeManifest(
+        name="voltage-regulator",
+        models={"libraries": [], "required_parameters": ["V_IN"]},
+    )
+
+    with pytest.raises(MissingParameterError) as exc_info:
+        run_spice(
+            _NETLIST_PATH,
+            _OUTPUT_DIR,
+            manifest=manifest,
+            feature_dir=_FEATURE_DIR,
+            provided_params={},
+        )
+
+    assert_that(str(exc_info.value), contains_string("voltage-regulator"))
+
+
+def test_run_spice_missing_parameter_error_includes_missing_param_name(fs):
+    """MissingParameterError from run_spice pre-flight includes the missing parameter name."""
+    fs.create_file(_NETLIST_PATH, contents="* netlist\n.end\n")
+    fs.create_dir(_FEATURE_DIR)
+    manifest = _FakeManifest(
+        name="voltage-regulator",
+        models={"libraries": [], "required_parameters": ["V_IN"]},
+    )
+
+    with pytest.raises(MissingParameterError) as exc_info:
+        run_spice(
+            _NETLIST_PATH,
+            _OUTPUT_DIR,
+            manifest=manifest,
+            feature_dir=_FEATURE_DIR,
+            provided_params={},
+        )
+
+    assert_that(str(exc_info.value), contains_string("V_IN"))
+
+
+def test_run_spice_proceeds_when_all_required_params_provided(fs):
+    """run_spice() launches ngspice normally when all required parameters are provided."""
+    fs.create_file(_NETLIST_PATH, contents="* netlist\n.end\n")
+    fs.create_dir(_FEATURE_DIR)
+    manifest = _FakeManifest(
+        name="voltage-regulator",
+        models={"libraries": [], "required_parameters": ["V_IN"]},
+    )
+
+    with patch(
+        "ci_feature.spice_runner.subprocess.run",
+        return_value=_make_completed_process(returncode=0),
+    ):
+        result = run_spice(
+            _NETLIST_PATH,
+            _OUTPUT_DIR,
+            manifest=manifest,
+            feature_dir=_FEATURE_DIR,
+            provided_params={"V_IN": 5.0},
+        )
+
+    assert_that(result, instance_of(SpiceResult))
 
 
 # ---------------------------------------------------------------------------
