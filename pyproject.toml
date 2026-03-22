@@ -2,3 +2,6 @@
 paths = ["features"]
 junit = true
 junit_directory = "reports/junit"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
