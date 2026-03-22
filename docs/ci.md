@@ -8,9 +8,10 @@ The CI pipeline runs on every pull request and on every push to the `main` branc
 
 1. **Checkout** – checks out the repository at the triggering commit.
 2. **Set up Python** – installs the specified Python version (3.12).
-3. **Check toolchain presence** – verifies that `kicad-cli`, `ngspice`, and `python` are available and prints their versions. Fails immediately with an actionable message if any tool is missing.
-4. **Install dependencies** – runs `pip install -r requirements.txt` to install `pytest` and any other listed packages.
-5. **Run tests** – executes `pytest -q`.  No tests exist yet; this step confirms that pytest is installed and can be invoked without error.
+3. **Install toolchain** – uses `apt-get` to install `kicad` (which provides `kicad-cli`) and `ngspice` on the Ubuntu runner.
+4. **Check toolchain presence** – verifies that `kicad-cli`, `ngspice`, and `python` are available and prints their versions. Fails immediately with an actionable message if any tool is missing.
+5. **Install dependencies** – runs `pip install -r requirements.txt` to install `pytest` and any other listed packages.
+6. **Run tests** – executes `pytest -q`.  No tests exist yet; this step confirms that pytest is installed and can be invoked without error.
 
 ### Design decisions
 
