@@ -9,10 +9,10 @@ from typing import Any, Dict, List, Optional
 from unittest.mock import MagicMock, patch
 
 import pytest
-from hamcrest import assert_that, contains_string, equal_to, instance_of
+from hamcrest import assert_that, contains_string, equal_to, has_entry, instance_of
 
 from ci_feature.spice_errors import MissingModelError, MissingParameterError
-from ci_feature.spice_runner import SpiceResult, SpiceRunError, run_spice
+from ci_feature.spice_runner import SpiceResult, SpiceRunError, parse_measure_results, run_spice
 
 _NETLIST_PATH = "/tmp/ci/fixtures/minimal.spice"
 _OUTPUT_DIR = "/tmp/ci_workspace/spice"
@@ -596,3 +596,104 @@ def test_run_spice_with_real_fixture():
         assert_that(result, instance_of(SpiceResult))
         assert_that(result.returncode, equal_to(0))
         assert_that(os.path.isfile(result.log_path), equal_to(True))
+
+
+# ---------------------------------------------------------------------------
+# parse_measure_results
+# ---------------------------------------------------------------------------
+
+
+class TestParseMeasureResults:
+    """Tests for parse_measure_results()."""
+
+    def test_returns_empty_dict_for_empty_string(self):
+        """parse_measure_results() returns {} for empty log content."""
+        assert_that(parse_measure_results(""), equal_to({}))
+
+    def test_parses_single_measure_result(self):
+        """parse_measure_results() extracts a single .meas result line."""
+        log = "v_out               =  3.300000e+00\n"
+        result = parse_measure_results(log)
+        assert_that(result, has_entry("V_OUT", equal_to(3.3)))
+
+    def test_result_key_is_uppercased(self):
+        """parse_measure_results() upper-cases the measurement name."""
+        log = "v_out = 3.3\n"
+        result = parse_measure_results(log)
+        assert "V_OUT" in result
+        assert "v_out" not in result
+
+    def test_parses_multiple_measure_results(self):
+        """parse_measure_results() extracts all .meas result lines."""
+        log = "v_out = 3.3\nv_in = 5.0\n"
+        result = parse_measure_results(log)
+        assert_that(result, has_entry("V_OUT", equal_to(3.3)))
+        assert_that(result, has_entry("V_IN", equal_to(5.0)))
+
+    def test_parses_scientific_notation(self):
+        """parse_measure_results() handles scientific notation (e.g. 2.500000e+00)."""
+        log = "v_mid               =  2.500000e+00\n"
+        result = parse_measure_results(log)
+        assert_that(result, has_entry("V_MID", equal_to(2.5)))
+
+    def test_parses_negative_value(self):
+        """parse_measure_results() handles negative values."""
+        log = "v_neg = -1.2e-03\n"
+        result = parse_measure_results(log)
+        assert_that(result, has_entry("V_NEG", equal_to(-1.2e-3)))
+
+    def test_ignores_table_header_lines(self):
+        """parse_measure_results() ignores .print table header lines."""
+        log = "Index   v-sweep         v(mid)\n0           5.000000e+00    2.500000e+00\n"
+        result = parse_measure_results(log)
+        # Table header/data rows have no '=' so nothing should be parsed
+        assert_that(result, equal_to({}))
+
+    def test_ignores_non_matching_lines(self):
+        """parse_measure_results() silently skips lines that do not match name=value."""
+        log = "No. of Data Rows : 1\nDoing analysis at TEMP = 27\n"
+        result = parse_measure_results(log)
+        # Neither line starts with a bare identifier followed by '=', so nothing is parsed
+        assert_that(result, equal_to({}))
+
+    def test_mixed_log_with_measure_and_print(self):
+        """parse_measure_results() extracts only the .meas line in a mixed log."""
+        log = (
+            "Index   v-sweep         v(mid)\n"
+            "0           5.000000e+00    2.500000e+00\n"
+            "v_out               =  3.300000e+00\n"
+            "No. of Data Rows : 1\n"
+        )
+        result = parse_measure_results(log)
+        assert_that(result, has_entry("V_OUT", equal_to(3.3)))
+
+
+class TestRunSpicePopulatesSignals:
+    """run_spice() populates SpiceResult.signals from the log file when available."""
+
+    def test_signals_is_empty_dict_when_log_file_absent(self, fs):
+        """SpiceResult.signals is empty when the log file does not exist."""
+        fs.create_file(_NETLIST_PATH, contents="* netlist\n.end\n")
+
+        with patch(
+            "ci_feature.spice_runner.subprocess.run",
+            return_value=_make_completed_process(returncode=0),
+        ):
+            result = run_spice(_NETLIST_PATH, _OUTPUT_DIR)
+
+        assert_that(result.signals, equal_to({}))
+
+    def test_signals_populated_from_log_file(self, fs):
+        """SpiceResult.signals is populated when the log file contains .meas results."""
+        fs.create_file(_NETLIST_PATH, contents="* netlist\n.end\n")
+        log_content = "v_out               =  3.300000e+00\n"
+
+        def fake_run(cmd, **kwargs):
+            # Write the log file as ngspice would
+            fs.create_file(_LOG_PATH, contents=log_content)
+            return _make_completed_process(returncode=0)
+
+        with patch("ci_feature.spice_runner.subprocess.run", side_effect=fake_run):
+            result = run_spice(_NETLIST_PATH, _OUTPUT_DIR)
+
+        assert_that(result.signals, has_entry("V_OUT", equal_to(3.3)))
