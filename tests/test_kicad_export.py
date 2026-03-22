@@ -214,3 +214,130 @@ def test_export_netlist_missing_file_error_is_netlist_export_error(fs):
             export_netlist(_MANIFEST, _OUTPUT_DIR, feature_dir=_FEATURE_DIR)
 
     assert_that(exc_info.value, instance_of(NetlistExportError))
+
+
+# ---------------------------------------------------------------------------
+# Feature name validation
+# ---------------------------------------------------------------------------
+
+
+def test_export_netlist_raises_for_name_with_path_separator(fs):
+    """export_netlist() raises NetlistExportError when feature name contains a path separator."""
+    manifest = FeatureManifest(
+        name="../evil",
+        version="1.0.0",
+        schematic="schematic/s.kicad_sch",
+        interface=["interface.yml"],
+        models={"libraries": [], "required_parameters": []},
+    )
+
+    with pytest.raises(NetlistExportError) as exc_info:
+        export_netlist(manifest, _OUTPUT_DIR, feature_dir=_FEATURE_DIR)
+
+    assert_that(str(exc_info.value), contains_string("../evil"))
+
+
+def test_export_netlist_raises_for_name_with_subdirectory(fs):
+    """export_netlist() raises NetlistExportError when feature name contains a subdirectory."""
+    manifest = FeatureManifest(
+        name="sub/dir",
+        version="1.0.0",
+        schematic="schematic/s.kicad_sch",
+        interface=["interface.yml"],
+        models={"libraries": [], "required_parameters": []},
+    )
+
+    with pytest.raises(NetlistExportError) as exc_info:
+        export_netlist(manifest, _OUTPUT_DIR, feature_dir=_FEATURE_DIR)
+
+    assert_that(str(exc_info.value), contains_string("sub/dir"))
+
+
+def test_export_netlist_raises_for_name_with_backslash(fs):
+    """export_netlist() raises NetlistExportError when feature name contains a backslash."""
+    manifest = FeatureManifest(
+        name="evil\\path",
+        version="1.0.0",
+        schematic="schematic/s.kicad_sch",
+        interface=["interface.yml"],
+        models={"libraries": [], "required_parameters": []},
+    )
+
+    with pytest.raises(NetlistExportError) as exc_info:
+        export_netlist(manifest, _OUTPUT_DIR, feature_dir=_FEATURE_DIR)
+
+    assert_that(str(exc_info.value), contains_string("evil\\path"))
+
+
+# ---------------------------------------------------------------------------
+# subprocess launch failures
+# ---------------------------------------------------------------------------
+
+
+def test_export_netlist_raises_netlist_export_error_when_kicad_cli_not_found(fs):
+    """export_netlist() raises NetlistExportError when kicad-cli is not installed."""
+    fs.create_dir(_FEATURE_DIR)
+
+    with patch(
+        "ci_feature.kicad_export.subprocess.run",
+        side_effect=FileNotFoundError("No such file or directory: 'kicad-cli'"),
+    ):
+        with pytest.raises(NetlistExportError):
+            export_netlist(_MANIFEST, _OUTPUT_DIR, feature_dir=_FEATURE_DIR)
+
+
+def test_export_netlist_error_message_includes_command_when_kicad_cli_not_found(fs):
+    """NetlistExportError for missing kicad-cli includes the attempted command."""
+    fs.create_dir(_FEATURE_DIR)
+
+    with patch(
+        "ci_feature.kicad_export.subprocess.run",
+        side_effect=FileNotFoundError("No such file or directory: 'kicad-cli'"),
+    ):
+        with pytest.raises(NetlistExportError) as exc_info:
+            export_netlist(_MANIFEST, _OUTPUT_DIR, feature_dir=_FEATURE_DIR)
+
+    assert_that(str(exc_info.value), contains_string("kicad-cli"))
+
+
+def test_export_netlist_chains_original_exception_on_file_not_found(fs):
+    """NetlistExportError chains the original FileNotFoundError as __cause__."""
+    fs.create_dir(_FEATURE_DIR)
+    original = FileNotFoundError("No such file or directory: 'kicad-cli'")
+
+    with patch(
+        "ci_feature.kicad_export.subprocess.run",
+        side_effect=original,
+    ):
+        with pytest.raises(NetlistExportError) as exc_info:
+            export_netlist(_MANIFEST, _OUTPUT_DIR, feature_dir=_FEATURE_DIR)
+
+    assert_that(exc_info.value.__cause__, instance_of(FileNotFoundError))
+
+
+def test_export_netlist_raises_netlist_export_error_on_os_error(fs):
+    """export_netlist() raises NetlistExportError when subprocess.run raises OSError."""
+    fs.create_dir(_FEATURE_DIR)
+
+    with patch(
+        "ci_feature.kicad_export.subprocess.run",
+        side_effect=OSError("permission denied"),
+    ):
+        with pytest.raises(NetlistExportError) as exc_info:
+            export_netlist(_MANIFEST, _OUTPUT_DIR, feature_dir=_FEATURE_DIR)
+
+    assert_that(str(exc_info.value), contains_string("permission denied"))
+
+
+def test_export_netlist_raises_netlist_export_error_on_timeout(fs):
+    """export_netlist() raises NetlistExportError when subprocess.run times out."""
+    fs.create_dir(_FEATURE_DIR)
+
+    with patch(
+        "ci_feature.kicad_export.subprocess.run",
+        side_effect=subprocess.TimeoutExpired(cmd=["kicad-cli"], timeout=30),
+    ):
+        with pytest.raises(NetlistExportError) as exc_info:
+            export_netlist(_MANIFEST, _OUTPUT_DIR, feature_dir=_FEATURE_DIR)
+
+    assert_that(str(exc_info.value), contains_string("kicad-cli"))
