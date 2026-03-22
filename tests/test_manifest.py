@@ -1,6 +1,5 @@
 """Unit tests for ci_feature.manifest."""
 
-import os
 import textwrap
 
 import pytest
@@ -86,6 +85,22 @@ def test_nonexistent_file_raises_file_not_found(tmp_path):
     with pytest.raises(FileNotFoundError) as exc_info:
         load_manifest(missing)
     assert missing in str(exc_info.value)
+
+
+def test_directory_path_raises_file_not_found(tmp_path):
+    """Passing a directory path raises FileNotFoundError, not IsADirectoryError."""
+    with pytest.raises(FileNotFoundError) as exc_info:
+        load_manifest(str(tmp_path))
+    assert str(tmp_path) in str(exc_info.value)
+
+
+def test_empty_yaml_raises_manifest_validation_error(tmp_path):
+    """An empty YAML file (parses as None) raises ManifestValidationError."""
+    p = tmp_path / "feature.yml"
+    p.write_text("")
+    with pytest.raises(ManifestValidationError) as exc_info:
+        load_manifest(str(p))
+    assert "NoneType" in str(exc_info.value)
 
 
 def test_malformed_yaml_raises_manifest_validation_error(tmp_path):

@@ -53,7 +53,7 @@ def load_manifest(path: str) -> FeatureManifest:
             parsed data does not satisfy the JSON Schema.  The message includes
             the name of the failing field or a YAML parse description.
     """
-    if not os.path.exists(path):
+    if not os.path.isfile(path):
         raise FileNotFoundError(f"Manifest file not found: {path}")
 
     with open(path) as f:
@@ -66,12 +66,34 @@ def load_manifest(path: str) -> FeatureManifest:
 
     schema = _load_schema()
 
+    # Ensure the manifest has a mapping/object at the root.  This provides a
+    # clearer error than opaque schema messages when the YAML is empty or is
+    # not a mapping (e.g. a bare scalar or list).
+    if not isinstance(data, dict):
+        raise ManifestValidationError(
+            f"Manifest root must be a mapping/object, got {type(data).__name__}"
+        )
+
     try:
         jsonschema.validate(instance=data, schema=schema)
     except jsonschema.ValidationError as exc:
-        raise ManifestValidationError(
-            f"Manifest validation failed: {exc.message}"
-        ) from exc
+        # Enhance the error message with the failing field path when available.
+        # json_path is available on ValidationError in jsonschema >= 4.18.0,
+        # which matches the pinned version in requirements.txt.
+        field_path = None
+        json_path = getattr(exc, "json_path", None)
+        if json_path:
+            # Trim leading "$." for brevity ("$.models.libraries" → "models.libraries").
+            field_path = json_path.lstrip("$.")
+        elif exc.path:
+            field_path = ".".join(str(p) for p in exc.path)
+
+        if field_path:
+            message = f"Manifest validation failed at '{field_path}': {exc.message}"
+        else:
+            message = f"Manifest validation failed: {exc.message}"
+
+        raise ManifestValidationError(message) from exc
 
     return FeatureManifest(
         name=data["name"],
