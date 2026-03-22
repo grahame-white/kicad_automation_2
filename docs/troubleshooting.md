@@ -15,11 +15,11 @@ each of which is a subclass of `SpiceRunError`:
 | `ConvergenceError` | `no convergence` or `timestep too small` in output | The simulation failed to converge |
 | `SpiceRunError` | Non-zero exit, unclassified | Any other ngspice failure |
 
-All exception messages include:
-- The ngspice command that was executed
-- The full stdout from ngspice
-- The full stderr from ngspice
-- The exit code
+All exception messages include the following information when it is available:
+- The ngspice command that was executed (for errors occurring after ngspice is launched)
+- The stdout captured from ngspice (full for completed runs, partial for timeouts)
+- The stderr captured from ngspice (full for completed runs, partial for timeouts)
+- The exit code (for errors occurring after ngspice is launched)
 
 ---
 
@@ -31,6 +31,7 @@ All exception messages include:
 
 ```spice
 * Fixture that triggers a missing model/include error
+* ngspice cannot open the referenced include file
 .include "nonexistent_model.lib"
 V1 in 0 DC 5V
 R1 in out 1k
@@ -60,6 +61,7 @@ ERROR: .include not found: nonexistent_model.lib
 
 ```spice
 * Fixture that triggers a syntax/parse error
+* The .model line below contains an invalid syntax that ngspice cannot parse
 V1 in 0 DC 5V
 .model BROKEN_MODEL %%% invalid_syntax_here
 .dc V1 5 5 1

@@ -96,15 +96,20 @@ def run_spice(netlist_path: str, output_dir: str, timeout: int = 60) -> SpiceRes
 
     Raises:
         SpiceRunError: If ``ngspice`` cannot be launched (e.g. not installed);
-            if ``ngspice`` does not complete within *timeout* seconds; or if
-            *netlist_path* does not exist.  Error messages include the command
-            that was attempted and any captured stdout/stderr.
+            if ``ngspice`` does not complete within *timeout* seconds; if
+            *netlist_path* does not exist; or if ``ngspice`` exits with a
+            non-zero status that does not match any known error pattern.
+            Error messages include the command that was attempted and any
+            captured stdout/stderr.
         MissingModelError: If ngspice output indicates a missing model or
-            include file (subclass of :class:`SpiceRunError`).
+            include file (raised instead of :class:`SpiceRunError` when a
+            non-zero exit is classified as a missing-model error).
         SpiceSyntaxError: If ngspice output indicates a syntax or parse error
-            in the netlist (subclass of :class:`SpiceRunError`).
+            in the netlist (raised instead of :class:`SpiceRunError` when a
+            non-zero exit is classified as a syntax error).
         ConvergenceError: If ngspice output indicates a simulation convergence
-            failure (subclass of :class:`SpiceRunError`).
+            failure (raised instead of :class:`SpiceRunError` when a non-zero
+            exit is classified as a convergence error).
     """
     netlist_path = os.path.realpath(netlist_path)
     output_dir = os.path.realpath(output_dir)
