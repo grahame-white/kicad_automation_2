@@ -20,7 +20,16 @@ def _iter_manifest_paths(
     if "schematic" in manifest_data:
         yield "schematic", manifest_data["schematic"]
     if "interface" in manifest_data:
-        yield "interface", manifest_data["interface"]
+        iface = manifest_data["interface"]
+        if isinstance(iface, list):
+            for i, path in enumerate(iface):
+                if not isinstance(path, str):
+                    raise IsolationViolationError(
+                        f"'interface[{i}]' must be a string path, got {type(path).__name__!r}."
+                    )
+                yield f"interface[{i}]", path
+        elif isinstance(iface, str):
+            yield "interface", iface
     if "models" in manifest_data and isinstance(manifest_data["models"], dict):
         libraries = manifest_data["models"].get("libraries", [])
         if isinstance(libraries, list):

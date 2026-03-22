@@ -23,9 +23,21 @@
       "minLength": 1
     },
     "interface": {
-      "type": "string",
-      "description": "Relative path to the interface.yml file.",
-      "minLength": 1
+      "description": "Relative path(s) to interface.yml file(s). A single path string or a list of path strings when the feature satisfies multiple interface contracts.",
+      "oneOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      ]
     },
     "models": {
       "type": "object",
