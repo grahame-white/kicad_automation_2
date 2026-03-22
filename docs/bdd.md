@@ -125,6 +125,34 @@ Valid signals are: V_OUT, GND
 
 Internal net names (e.g. `NET001`) are an implementation detail of the schematic and may change without notice.  Allowing scenarios to assert on internal nets would couple tests to the schematic internals, making them brittle and defeating the purpose of the interface contract.
 
+## Feature selection in scenarios
+
+Scenarios can select a feature by name using the `Given the feature "<name>"` step.  This step
+uses the manifest discovery system to locate the feature's `feature.yml` file and loads it for
+use in subsequent steps.
+
+```gherkin
+Feature: Voltage regulator
+  Scenario: Output voltage in tolerance
+    Given the feature "voltage-regulator"
+    ...
+```
+
+The step calls `discover_features()` from `ci_feature/discovery.py` to scan the repository for
+all `feature.yml` files, then finds the one whose `name` field matches the requested name.  The
+loaded `FeatureManifest` is stored on `context.feature_manifest` for use in subsequent steps.
+
+If the requested name is not found, the step fails immediately with a clear error message listing
+all feature names that were discovered:
+
+```
+AssertionError: Feature 'unknown-feature' not found. Available features: voltage-regulator, current-sensor
+```
+
+The repository root used for discovery is set by the `before_scenario` hook in
+`features/environment.py`.  It defaults to the root of the repository so no additional
+configuration is required.
+
 ## CI integration
 
 The CI pipeline runs `behave` automatically on every pull request and push to `main`.  See [ci.md](ci.md) for details of the rest of the CI pipeline (currently focused on the pytest-based tests).
