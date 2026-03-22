@@ -17,6 +17,7 @@ __all__ = [
     "InterfaceContract",
     "InterfaceValidationError",
     "load_interface",
+    "validate_signal_name",
 ]
 
 SCHEMA_PATH = os.path.realpath(
@@ -102,3 +103,23 @@ def load_interface(path: str) -> InterfaceContract:
         version=data["version"],
         signals=data["signals"],
     )
+
+
+def validate_signal_name(signal_name: str, interface: InterfaceContract) -> None:
+    """Validate that a signal name is declared in an interface contract.
+
+    Args:
+        signal_name: The signal name to validate.
+        interface: The :class:`InterfaceContract` to validate against.
+
+    Raises:
+        InterfaceValidationError: If *signal_name* is not declared in *interface*.
+            The message includes the invalid name, the interface/feature name, and
+            all valid signal names.
+    """
+    valid_names = [s["name"] for s in interface.signals]
+    if signal_name not in valid_names:
+        raise InterfaceValidationError(
+            f"Signal '{signal_name}' is not declared in interface '{interface.name}'. "
+            f"Valid signals are: {', '.join(valid_names)}"
+        )

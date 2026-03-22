@@ -104,6 +104,27 @@ behave --tags=~@slow
 
 The CI pipeline runs `@fast` scenarios in a dedicated step **before** the full suite.  This ensures that fundamental simulation errors are caught quickly, without waiting for long-running simulations to finish.  The `@schema` scenarios also run in this early step so that manifest or schema issues are surfaced immediately.
 
+## Interface-only observability rule
+
+Scenarios may only reference signals that are declared in the feature's `interface.yml` contract.  Referencing an internal schematic net that is not declared in the interface is a contract violation and must fail **before** any simulation runs.
+
+This rule is enforced by `validate_signal_name(signal_name, interface)` in `ci_feature/interface.py`.  When a signal name is referenced in a step, it is validated against the loaded `InterfaceContract`.  If the name is not present, an `InterfaceValidationError` is raised immediately with a message that includes:
+
+- the **invalid signal name** that was referenced,
+- the **interface/feature name** it was validated against, and
+- the **list of all valid signal names** declared in that interface.
+
+### Example error
+
+```
+InterfaceValidationError: Signal 'NET001' is not declared in interface 'dc-power-supply'.
+Valid signals are: V_OUT, GND
+```
+
+### Why this rule exists
+
+Internal net names (e.g. `NET001`) are an implementation detail of the schematic and may change without notice.  Allowing scenarios to assert on internal nets would couple tests to the schematic internals, making them brittle and defeating the purpose of the interface contract.
+
 ## CI integration
 
 The CI pipeline runs `behave` automatically on every pull request and push to `main`.  See [ci.md](ci.md) for details of the rest of the CI pipeline (currently focused on the pytest-based tests).
