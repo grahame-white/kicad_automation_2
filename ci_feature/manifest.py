@@ -7,6 +7,7 @@ from typing import Any, Dict, Optional
 import jsonschema
 import yaml
 
+from ci_feature.interface import InterfaceValidationError, load_interface
 from ci_feature.isolation import IsolationViolationError, validate_isolation
 
 __all__ = [
@@ -61,8 +62,9 @@ def load_manifest(path: str) -> FeatureManifest:
     Raises:
         FileNotFoundError: If *path* does not exist.  The message includes the path.
         ManifestValidationError: If the file contains malformed YAML or if the
-            parsed data does not satisfy the JSON Schema.  The message includes
-            the name of the failing field or a YAML parse description.
+            parsed data does not satisfy the JSON Schema, or if the referenced
+            ``interface.yml`` is missing or invalid.  The message includes the
+            feature name, the interface path, and the nature of the failure.
         IsolationViolationError: If any path in the manifest is absolute or resolves
             outside the feature's directory subtree.  The message names the offending
             field and path and explains the isolation rule.
@@ -109,6 +111,18 @@ def load_manifest(path: str) -> FeatureManifest:
 
     feature_dir = os.path.dirname(os.path.realpath(path))
     validate_isolation(feature_dir, data)
+
+    interface_path = os.path.join(feature_dir, data["interface"])
+    try:
+        load_interface(interface_path)
+    except FileNotFoundError:
+        raise ManifestValidationError(
+            f"Feature '{data['name']}' references interface '{interface_path}' which does not exist"
+        ) from None
+    except InterfaceValidationError as exc:
+        raise ManifestValidationError(
+            f"Feature '{data['name']}' has invalid interface '{interface_path}': {exc}"
+        ) from exc
 
     return FeatureManifest(
         name=data["name"],

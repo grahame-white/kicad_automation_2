@@ -74,3 +74,60 @@ An invalid `direction` value produces:
 ```
 jsonschema.exceptions.ValidationError: 'unknown' is not one of ['input', 'output', 'bidirectional']
 ```
+
+## Feature-to-interface linkage
+
+Every `feature.yml` must declare an `interface` field pointing to a valid `interface.yml`
+within the same feature directory subtree.  When a feature manifest is loaded by
+`ci_feature.manifest.load_manifest`, the referenced interface file is automatically
+resolved and validated.
+
+### Rules
+
+1. The `interface` field in `feature.yml` must be a **relative path** to an
+   `interface.yml` file inside the feature's directory subtree.
+2. The referenced `interface.yml` must **exist** at that path.
+3. The referenced `interface.yml` must be **parseable YAML** and must **conform to the
+   interface JSON Schema** (`ci/schemas/interface.schema.json`).
+
+### Failure modes
+
+| Condition | Error raised | Error message includes |
+|-----------|-------------|------------------------|
+| `interface.yml` does not exist | `ManifestValidationError` | Feature name + missing path |
+| `interface.yml` is not parseable YAML | `ManifestValidationError` | Feature name + path + YAML error |
+| `interface.yml` fails schema validation | `ManifestValidationError` | Feature name + path + field name |
+
+Example error when the interface file is missing:
+
+```
+ManifestValidationError: Feature 'voltage-regulator' references interface
+'/path/to/feature/interface.yml' which does not exist
+```
+
+Example error when the interface file is invalid:
+
+```
+ManifestValidationError: Feature 'voltage-regulator' has invalid interface
+'/path/to/feature/interface.yml': Interface validation failed: 'signals' is a required property
+```
+
+### Example feature.yml with interface linkage
+
+```yaml
+name: voltage-regulator
+version: "1.0.0"
+schematic: schematic/voltage-regulator.kicad_sch
+interface: interface.yml
+models:
+  libraries:
+    - models/ldo.spice
+  required_parameters:
+    - V_IN
+    - V_OUT
+```
+
+The `interface: interface.yml` entry links this feature to the `interface.yml` file
+in the same directory.  If that file is absent or invalid, loading the manifest will
+fail with a clear error message that names both the feature and the problematic path.
+

@@ -6,12 +6,14 @@ import textwrap
 import pytest
 from hamcrest import assert_that, contains_string, empty, equal_to, has_length, instance_of
 
+import ci_feature.interface as interface_module
 import ci_feature.manifest as manifest_module
 from ci_feature.discovery import discover_features
 from ci_feature.manifest import FeatureManifest, ManifestValidationError
 
-# Resolved absolute path to the schema file so pyfakefs can expose it.
+# Resolved absolute paths to the schema files so pyfakefs can expose them.
 _SCHEMA_REAL_PATH = os.path.realpath(manifest_module.SCHEMA_PATH)
+_INTERFACE_SCHEMA_REAL_PATH = os.path.realpath(interface_module.SCHEMA_PATH)
 
 VALID_MANIFEST_YAML = textwrap.dedent("""\
     name: voltage-regulator
@@ -50,19 +52,38 @@ VALID_MANIFEST_YAML_3 = textwrap.dedent("""\
         - F_CUTOFF
 """)
 
+VALID_INTERFACE_YAML = textwrap.dedent("""\
+    name: dc-power-supply
+    version: "1.0.0"
+    signals:
+      - name: V_OUT
+        direction: output
+        domain: analog
+        unit: V
+        description: Output voltage
+      - name: GND
+        direction: input
+        domain: analog
+        unit: V
+        description: Ground reference
+""")
+
 
 @pytest.fixture(autouse=True)
 def clear_schema_cache():
-    """Clear the schema LRU cache before and after every test for isolation."""
+    """Clear the schema LRU caches before and after every test for isolation."""
     manifest_module._load_schema.cache_clear()
+    interface_module._load_schema.cache_clear()
     yield
     manifest_module._load_schema.cache_clear()
+    interface_module._load_schema.cache_clear()
 
 
 @pytest.fixture
 def fake_fs(fs):
-    """Fake filesystem pre-loaded with the real JSON Schema so load_manifest() can find it."""
+    """Fake filesystem pre-loaded with the real JSON Schemas so load_manifest() can find them."""
     fs.add_real_file(_SCHEMA_REAL_PATH, read_only=True)
+    fs.add_real_file(_INTERFACE_SCHEMA_REAL_PATH, read_only=True)
     return fs
 
 
@@ -78,6 +99,9 @@ def test_single_feature_is_discovered(fake_fs):
     fake_fs.create_file(
         "/repo/features/voltage-regulator/feature.yml", contents=VALID_MANIFEST_YAML
     )
+    fake_fs.create_file(
+        "/repo/features/voltage-regulator/interface.yml", contents=VALID_INTERFACE_YAML
+    )
     result = discover_features("/repo")
     assert_that(result, has_length(1))
     assert_that(result[0], instance_of(FeatureManifest))
@@ -87,8 +111,11 @@ def test_single_feature_is_discovered(fake_fs):
 def test_multiple_features_in_different_subdirectories(fake_fs):
     """discover_features() discovers all feature.yml files across subdirectories."""
     fake_fs.create_file("/repo/features/alpha/feature.yml", contents=VALID_MANIFEST_YAML)
+    fake_fs.create_file("/repo/features/alpha/interface.yml", contents=VALID_INTERFACE_YAML)
     fake_fs.create_file("/repo/features/beta/feature.yml", contents=VALID_MANIFEST_YAML_2)
+    fake_fs.create_file("/repo/features/beta/interface.yml", contents=VALID_INTERFACE_YAML)
     fake_fs.create_file("/repo/features/gamma/feature.yml", contents=VALID_MANIFEST_YAML_3)
+    fake_fs.create_file("/repo/features/gamma/interface.yml", contents=VALID_INTERFACE_YAML)
     result = discover_features("/repo")
     assert_that(result, has_length(3))
 
@@ -96,8 +123,11 @@ def test_multiple_features_in_different_subdirectories(fake_fs):
 def test_discovery_order_is_deterministic(fake_fs):
     """discover_features() returns manifests sorted alphabetically by path."""
     fake_fs.create_file("/repo/features/alpha/feature.yml", contents=VALID_MANIFEST_YAML)
+    fake_fs.create_file("/repo/features/alpha/interface.yml", contents=VALID_INTERFACE_YAML)
     fake_fs.create_file("/repo/features/beta/feature.yml", contents=VALID_MANIFEST_YAML_2)
+    fake_fs.create_file("/repo/features/beta/interface.yml", contents=VALID_INTERFACE_YAML)
     fake_fs.create_file("/repo/features/gamma/feature.yml", contents=VALID_MANIFEST_YAML_3)
+    fake_fs.create_file("/repo/features/gamma/interface.yml", contents=VALID_INTERFACE_YAML)
     result = discover_features("/repo")
     names = [m.name for m in result]
     assert_that(names, equal_to(["voltage-regulator", "current-sensor", "filter-stage"]))
@@ -106,8 +136,11 @@ def test_discovery_order_is_deterministic(fake_fs):
 def test_discovery_order_matches_alpha_sort(fake_fs):
     """discover_features() returns manifests in alphabetical path order on repeated calls."""
     fake_fs.create_file("/repo/features/charlie/feature.yml", contents=VALID_MANIFEST_YAML_3)
+    fake_fs.create_file("/repo/features/charlie/interface.yml", contents=VALID_INTERFACE_YAML)
     fake_fs.create_file("/repo/features/alpha/feature.yml", contents=VALID_MANIFEST_YAML)
+    fake_fs.create_file("/repo/features/alpha/interface.yml", contents=VALID_INTERFACE_YAML)
     fake_fs.create_file("/repo/features/bravo/feature.yml", contents=VALID_MANIFEST_YAML_2)
+    fake_fs.create_file("/repo/features/bravo/interface.yml", contents=VALID_INTERFACE_YAML)
     result1 = discover_features("/repo")
     result2 = discover_features("/repo")
     assert_that([m.name for m in result1], equal_to([m.name for m in result2]))
@@ -119,6 +152,7 @@ def test_discovery_order_matches_alpha_sort(fake_fs):
 def test_directories_without_feature_yml_are_ignored(fake_fs):
     """discover_features() ignores directories that do not contain feature.yml."""
     fake_fs.create_file("/repo/features/alpha/feature.yml", contents=VALID_MANIFEST_YAML)
+    fake_fs.create_file("/repo/features/alpha/interface.yml", contents=VALID_INTERFACE_YAML)
     fake_fs.create_file("/repo/features/no-manifest/other.yml", contents="some: data\n")
     fake_fs.create_dir("/repo/features/empty-dir")
     result = discover_features("/repo")
@@ -131,6 +165,9 @@ def test_nested_feature_directories_are_discovered(fake_fs):
     fake_fs.create_file(
         "/repo/subsystems/power/features/vreg/feature.yml", contents=VALID_MANIFEST_YAML
     )
+    fake_fs.create_file(
+        "/repo/subsystems/power/features/vreg/interface.yml", contents=VALID_INTERFACE_YAML
+    )
     result = discover_features("/repo")
     assert_that(result, has_length(1))
     assert_that(result[0].name, equal_to("voltage-regulator"))
@@ -139,6 +176,7 @@ def test_nested_feature_directories_are_discovered(fake_fs):
 def test_returns_feature_manifest_instances(fake_fs):
     """discover_features() returns FeatureManifest objects, not raw dicts."""
     fake_fs.create_file("/repo/feat/feature.yml", contents=VALID_MANIFEST_YAML)
+    fake_fs.create_file("/repo/feat/interface.yml", contents=VALID_INTERFACE_YAML)
     result = discover_features("/repo")
     assert_that(result[0], instance_of(FeatureManifest))
 
@@ -154,7 +192,9 @@ def test_invalid_feature_yml_raises_manifest_validation_error(fake_fs):
 def test_result_names_match_manifests(fake_fs):
     """discover_features() correctly populates manifest fields from each file."""
     fake_fs.create_file("/repo/a/feature.yml", contents=VALID_MANIFEST_YAML)
+    fake_fs.create_file("/repo/a/interface.yml", contents=VALID_INTERFACE_YAML)
     fake_fs.create_file("/repo/b/feature.yml", contents=VALID_MANIFEST_YAML_2)
+    fake_fs.create_file("/repo/b/interface.yml", contents=VALID_INTERFACE_YAML)
     result = discover_features("/repo")
     assert_that(result, has_length(2))
     names = {m.name for m in result}

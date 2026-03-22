@@ -6,16 +6,19 @@ import textwrap
 import pytest
 from hamcrest import assert_that, contains_string, equal_to
 
+import ci_feature.interface as interface_module
 import ci_feature.manifest as manifest_module
 from ci_feature.isolation import IsolationViolationError, validate_isolation
 from ci_feature.manifest import load_manifest
 
-# Resolved absolute path to the schema file so pyfakefs can expose it.
+# Resolved absolute paths to the schema files so pyfakefs can expose them.
 _SCHEMA_REAL_PATH = os.path.realpath(manifest_module.SCHEMA_PATH)
+_INTERFACE_SCHEMA_REAL_PATH = os.path.realpath(interface_module.SCHEMA_PATH)
 
 # A fixed feature directory and manifest path inside the fake filesystem.
 _FEATURE_DIR = "/repo/features/my-feature"
 _MANIFEST_PATH = f"{_FEATURE_DIR}/feature.yml"
+_INTERFACE_PATH = f"{_FEATURE_DIR}/interface.yml"
 
 VALID_MANIFEST_DATA = {
     "name": "my-feature",
@@ -40,19 +43,38 @@ VALID_MANIFEST_YAML = textwrap.dedent("""\
         - V_IN
 """)
 
+VALID_INTERFACE_YAML = textwrap.dedent("""\
+    name: dc-power-supply
+    version: "1.0.0"
+    signals:
+      - name: V_OUT
+        direction: output
+        domain: analog
+        unit: V
+        description: Output voltage
+      - name: GND
+        direction: input
+        domain: analog
+        unit: V
+        description: Ground reference
+""")
+
 
 @pytest.fixture(autouse=True)
 def clear_schema_cache():
-    """Clear the schema LRU cache before and after every test for isolation."""
+    """Clear the schema LRU caches before and after every test for isolation."""
     manifest_module._load_schema.cache_clear()
+    interface_module._load_schema.cache_clear()
     yield
     manifest_module._load_schema.cache_clear()
+    interface_module._load_schema.cache_clear()
 
 
 @pytest.fixture
 def fake_fs(fs):
-    """Fake filesystem pre-loaded with the real JSON Schema so load_manifest() can find it."""
+    """Fake filesystem pre-loaded with the real JSON Schemas so load_manifest() can find them."""
     fs.add_real_file(_SCHEMA_REAL_PATH, read_only=True)
+    fs.add_real_file(_INTERFACE_SCHEMA_REAL_PATH, read_only=True)
     return fs
 
 
@@ -168,6 +190,7 @@ def test_load_manifest_valid_relative_paths_pass(fake_fs):
     """load_manifest() succeeds when all paths are relative and within the feature directory."""
     fake_fs.create_dir(_FEATURE_DIR)
     fake_fs.create_file(_MANIFEST_PATH, contents=VALID_MANIFEST_YAML)
+    fake_fs.create_file(_INTERFACE_PATH, contents=VALID_INTERFACE_YAML)
     manifest = load_manifest(_MANIFEST_PATH)
     assert_that(manifest.name, equal_to("my-feature"))
 
