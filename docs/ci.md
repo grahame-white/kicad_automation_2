@@ -4,20 +4,47 @@
 
 The CI pipeline runs on every pull request and on every push to the `main` branch.
 
-### Steps
+It is structured as two sequential jobs: `fast-check` and `full-suite`. See [Fail-fast gating](#fail-fast-gating) for details.
+
+### `fast-check` job steps
 
 1. **Checkout** – checks out the repository at the triggering commit.
 2. **Set up Python** – installs the specified Python version (3.12).
-3. **Install toolchain** – adds the KiCad 9.0 PPA (`ppa:kicad/kicad-9.0-releases`) and uses `apt-get` to install `kicad` 9.x (which provides `kicad-cli`) and `ngspice` on the Ubuntu runner.
-4. **Check toolchain presence** – verifies that `kicad-cli`, `ngspice`, and `python` are available and prints their versions. Fails immediately with an actionable message if any tool is missing.
-5. **Install dependencies** – runs `pip install -r requirements.txt` to install `pytest` and any other listed packages.
-6. **Run tests** – executes `pytest -q`.  No tests exist yet; this step confirms that pytest is installed and can be invoked without error.
+3. **Shared CI setup** – runs `.github/actions/ci-setup` (composite action) which installs the KiCad/ngspice toolchain, checks tool presence, and installs Python dependencies.  See [Toolchain requirements](#toolchain-requirements).
+4. **Run tests** – executes `pytest -q` to run the unit test suite under `tests/`.  Exit code 5 ("no tests collected") is treated as success to allow the step to pass on a fresh checkout before any test files are added.
+5. **Run fast BDD scenarios** – executes `behave --tags=@fast` to run only the `@fast`-tagged scenarios.  Failures here block the `full-suite` job from running.
+
+### `full-suite` job steps
+
+1. **Checkout** – checks out the repository at the triggering commit.
+2. **Set up Python** – installs the specified Python version (3.12).
+3. **Shared CI setup** – runs `.github/actions/ci-setup` (same composite action as `fast-check`).
+4. **Run BDD scenarios** – executes the full Behave suite with the HTML formatter, producing `reports/behave-report.html`.
+5. **Upload behave reports** – uploads the `reports/` directory as a downloadable artifact named `behave-reports`.
 
 ### Design decisions
 
 - All GitHub Actions used in the CI workflow are pinned to a full commit SHA to prevent supply-chain attacks.
 - Top-level workflow permissions are set to `none`; individual jobs request only what they need (`contents: read`).
 - Dependabot is configured to keep GitHub Actions dependencies up to date automatically.
+
+## Fail-fast gating
+
+The CI pipeline uses a two-stage approach to give quick feedback on fundamental errors before investing time in the full simulation suite.
+
+```
+fast-check  ──►  full-suite
+```
+
+- **`fast-check`** runs `behave --tags=@fast` (plus `pytest`).  These scenarios are tagged `@fast` because they complete quickly and cover the most critical paths.  If any `@fast` scenario fails, the job fails immediately and the `full-suite` job is **blocked** from running.
+- **`full-suite`** depends on `fast-check` via `needs: fast-check`.  It only starts if `fast-check` passes, then runs the complete Behave suite and uploads the HTML report as part of the `reports/` artifact.
+
+This means:
+
+- A broken fundamental always fails the PR quickly, without waiting for the full (slower) simulation suite.
+- The full suite only consumes runner resources when the fast scenarios are healthy.
+- CI output clearly shows two separate stages so it is easy to see at a glance which stage failed.
+- When `fast-check` is red, `full-suite` never runs, so no `reports/` artifact (including `behave-report.html`) will be generated or uploaded for that run.
 
 ## Toolchain requirements
 
