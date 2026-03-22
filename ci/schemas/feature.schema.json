@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/grahame-white/kicad_automation_2/ci/schemas/feature.schema.json",
+  "title": "Feature Manifest",
+  "description": "Per-feature manifest schema for feature discovery, configuration, and CI orchestration.",
+  "type": "object",
+  "required": ["name", "version", "schematic", "interface", "models"],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Unique feature identifier.",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "description": "Semantic version of the feature.",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?$"
+    },
+    "schematic": {
+      "type": "string",
+      "description": "Relative path to the KiCad schematic file.",
+      "minLength": 1
+    },
+    "interface": {
+      "type": "string",
+      "description": "Relative path to the interface.yml file.",
+      "minLength": 1
+    },
+    "models": {
+      "type": "object",
+      "description": "SPICE model configuration.",
+      "required": ["libraries", "required_parameters"],
+      "additionalProperties": false,
+      "properties": {
+        "libraries": {
+          "type": "array",
+          "description": "List of relative paths to SPICE model files.",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required_parameters": {
+          "type": "array",
+          "description": "List of parameter names that must be provided.",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "configuration": {
+      "type": "object",
+      "description": "Optional default parameter values.",
+      "additionalProperties": {
+        "type": ["number", "string", "boolean"]
+      }
+    }
+  }
+}
