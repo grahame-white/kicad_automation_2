@@ -1,2 +1,4 @@
 [tool.behave]
 paths = ["features"]
+junit = true
+junit_directory = "reports/junit"
