@@ -1,0 +1,62 @@
+# BDD with Behave
+
+This project uses [Behave](https://behave.readthedocs.io/) to run BDD (Behaviour-Driven Development) scenarios written in [Gherkin](https://cucumber.io/docs/gherkin/) syntax.
+
+## Directory structure
+
+```
+features/
+  example.feature          # Gherkin feature files
+  steps/
+    example_steps.py       # Python step-definition files
+```
+
+All feature files live under `features/` and all step-definition modules live under `features/steps/`.
+
+## Running scenarios locally
+
+Install the dependencies and run `behave` from the repository root:
+
+```bash
+pip install -r requirements.txt
+behave
+```
+
+## Adding a new scenario
+
+1. **Write a feature file** – create (or edit) a `.feature` file under `features/`.  Each file describes one feature and may contain one or more scenarios written in Gherkin:
+
+   ```gherkin
+   Feature: My new feature
+     Scenario: Something useful happens
+       Given some precondition
+       When an action is taken
+       Then the expected outcome is observed
+   ```
+
+2. **Implement the steps** – create (or edit) a Python module under `features/steps/` and implement any unrecognised steps using the `@given`, `@when`, and `@then` decorators from `behave`:
+
+   ```python
+   from behave import given, then, when
+
+   @given("some precondition")
+   def step_some_precondition(context):
+       # set up state on the context object
+       pass
+
+   @when("an action is taken")
+   def step_an_action_is_taken(context):
+       # perform the action
+       pass
+
+   @then("the expected outcome is observed")
+   def step_expected_outcome_is_observed(context):
+       # assert the outcome
+       pass
+   ```
+
+3. **Verify locally** – run `behave` and confirm all scenarios pass before opening a pull request.
+
+## CI integration
+
+The CI pipeline runs `behave` automatically on every pull request and push to `main`.  See [ci.md](ci.md) for details of the rest of the CI pipeline (currently focused on the pytest-based tests).

@@ -56,3 +56,6 @@ jobs:
           if [ "${exit_code:-0}" -ne 0 ] && [ "${exit_code:-0}" -ne 5 ]; then
             exit "${exit_code}"
           fi
+
+      - name: Run BDD scenarios
+        run: behave
