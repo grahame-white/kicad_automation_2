@@ -63,7 +63,7 @@ Scenarios can be tagged to control execution order and filtering.
 
 | Tag | Meaning | When to use |
 |-----|---------|-------------|
-| `@fast` | Lightweight simulation smoke test, no external tooling required | Quick pass/fail simulation checks |
+| `@fast` | Short-running simulation smoke test; may require KiCad/SPICE toolchain | Quick pass/fail simulation checks |
 | `@schema` | Schema or manifest validation, no external tooling required | Validating JSON Schema, YAML manifests, or file structure |
 | `@slow` | Long-running, requires KiCad/SPICE toolchain | Full simulation or export scenarios |
 
