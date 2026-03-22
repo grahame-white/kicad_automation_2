@@ -71,6 +71,44 @@ features = discover_features(root_path="/repo")
 - **Fail-fast validation** – `load_manifest()` validates each manifest against the JSON Schema
   during discovery, so malformed manifests are caught immediately.
 
+## Netlist artefacts
+
+The CI pipeline exports a KiCad netlist for each feature's schematic using
+`kicad-cli sch export netlist`.  The `export_netlist()` function in
+`ci_feature/kicad_export.py` handles this step.
+
+### Output location
+
+Netlists are written to a per-feature subdirectory within the CI workspace
+directory (default: `/tmp/ci_workspace`):
+
+```
+{output_dir}/{feature-name}/{feature-name}.net
+```
+
+For example, a feature named `voltage-regulator` produces:
+
+```
+/tmp/ci_workspace/voltage-regulator/voltage-regulator.net
+```
+
+### Usage
+
+```python
+from ci_feature.kicad_export import export_netlist
+
+netlist_path = export_netlist(manifest, output_dir="/tmp/ci_workspace", feature_dir="/repo/features/voltage-regulator")
+# Returns path to the generated netlist file, e.g. /tmp/ci_workspace/voltage-regulator/voltage-regulator.net
+```
+
+### Error handling
+
+- If `kicad-cli` exits with a non-zero status, a `NetlistExportError` is raised
+  with the exit code and the full stdout/stderr captured from `kicad-cli`,
+  making the failure immediately actionable.
+- If the expected output file is missing or empty after a successful `kicad-cli`
+  run, a `NetlistExportError` is raised with the expected file path.
+
 ## Behavioural test reports
 
 After the **Run BDD scenarios** step completes (whether it passes or fails), the CI pipeline uploads the contents of the `reports/` directory as a downloadable artifact named **`behave-reports`**.
