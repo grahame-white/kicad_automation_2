@@ -3,13 +3,13 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-from hamcrest import assert_that, contains_string, equal_to
+from hamcrest import assert_that, contains_string, equal_to, none
 
 from ci_feature.manifest import FeatureManifest
 from features.steps.feature_steps import step_the_feature
 
 
-def _make_manifest(name):
+def _make_manifest(name, directory=None):
     """Create a minimal FeatureManifest with the given name for testing."""
     return FeatureManifest(
         name=name,
@@ -17,6 +17,7 @@ def _make_manifest(name):
         schematic=f"schematic/{name}.kicad_sch",
         interface=["interface.yml"],
         models={"libraries": [], "required_parameters": []},
+        directory=directory,
     )
 
 
@@ -42,6 +43,33 @@ def test_step_selects_correct_manifest_when_multiple_exist():
         step_the_feature(context, "current-sensor")
 
     assert_that(context.feature_manifest, equal_to(manifests[1]))
+
+
+def test_step_stores_feature_dir_from_manifest():
+    """step_the_feature stores context.feature_dir from the matched manifest's directory field."""
+    context = MagicMock()
+    context.feature_root = "/repo"
+    manifests = [
+        _make_manifest("voltage-regulator", directory="/repo/schematics/voltage-regulator"),
+        _make_manifest("current-sensor"),
+    ]
+
+    with patch("features.steps.feature_steps.discover_features", return_value=manifests):
+        step_the_feature(context, "voltage-regulator")
+
+    assert_that(context.feature_dir, equal_to("/repo/schematics/voltage-regulator"))
+
+
+def test_step_stores_none_feature_dir_when_manifest_has_no_directory():
+    """step_the_feature stores None for context.feature_dir when manifest.directory is None."""
+    context = MagicMock()
+    context.feature_root = "/repo"
+    manifests = [_make_manifest("voltage-regulator", directory=None)]
+
+    with patch("features.steps.feature_steps.discover_features", return_value=manifests):
+        step_the_feature(context, "voltage-regulator")
+
+    assert_that(context.feature_dir, none())
 
 
 def test_step_not_found_raises_assertion_error():
