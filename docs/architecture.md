@@ -76,3 +76,41 @@ validate_isolation("/path/to/feature-dir", manifest_data_dict)
 
 `load_manifest()` raises `IsolationViolationError` (not `ManifestValidationError`) for isolation
 failures, allowing callers to distinguish between schema errors and path-locality errors.
+
+---
+
+## Netlist pipeline
+
+Netlist export for a feature is handled by `ci_feature.kicad_export.export_netlist()`.  The
+pipeline has two stages:
+
+```
+kicad-cli sch export netlist   →   normalize_netlist()   →   normalised .net file
+```
+
+### Stage 1 — raw export
+
+`export_netlist()` invokes `kicad-cli sch export netlist` to produce a raw netlist file inside a
+per-feature subdirectory of the CI workspace.
+
+### Stage 2 — normalisation hook
+
+After a successful export `export_netlist()` calls
+`ci_feature.netlist.normalize_netlist(input_path, output_path)`.
+
+**Current behaviour (pass-through):** the function reads the raw netlist and writes it to the
+output path unchanged.  This means the exported file is currently identical to the raw
+`kicad-cli` output.
+
+**Extension point:** future normalisation transformations — such as sorting net entries,
+stripping volatile timestamps, or reformatting the file for stable diffs — should be implemented
+inside `normalize_netlist()`.  The rest of the pipeline does not need to change.
+
+### API
+
+```python
+from ci_feature.netlist import normalize_netlist
+
+normalize_netlist(input_path="raw.net", output_path="normalized.net")
+# Currently: copies input to output unchanged
+```
