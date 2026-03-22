@@ -3,6 +3,7 @@
 __all__ = [
     "ConvergenceError",
     "MissingModelError",
+    "MissingParameterError",
     "SpiceRunError",
     "SpiceSyntaxError",
 ]
@@ -14,6 +15,10 @@ class SpiceRunError(Exception):
 
 class MissingModelError(SpiceRunError):
     """Raised when ngspice cannot find a required model or include file."""
+
+
+class MissingParameterError(Exception):
+    """Raised when required SPICE model parameters are not provided by the scenario."""
 
 
 class SpiceSyntaxError(SpiceRunError):
