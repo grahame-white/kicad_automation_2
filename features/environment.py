@@ -12,7 +12,10 @@ def before_scenario(context, scenario):
 
     Resets ``context.feature_manifest`` to ``None`` so that a scenario that
     forgets to call ``Given the feature ...`` does not accidentally inherit the
-    manifest loaded by a previous scenario.
+    manifest loaded by a previous scenario.  Also resets ``context.feature_dir``
+    and ``context.simulation_result`` to ``None`` for the same reason.
     """
     context.feature_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     context.feature_manifest = None
+    context.feature_dir = None
+    context.simulation_result = None

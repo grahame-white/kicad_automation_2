@@ -48,6 +48,7 @@ class FeatureManifest:
     interface: List[str]
     models: Dict[str, Any]
     configuration: Optional[Dict[str, Any]] = None
+    directory: Optional[str] = None
 
 
 def load_manifest(path: str) -> FeatureManifest:
@@ -138,4 +139,5 @@ def load_manifest(path: str) -> FeatureManifest:
         interface=interfaces,
         models=data["models"],
         configuration=data.get("configuration"),
+        directory=feature_dir,
     )

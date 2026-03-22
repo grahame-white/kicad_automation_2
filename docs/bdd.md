@@ -153,6 +153,54 @@ The repository root used for discovery is set by the `before_scenario` hook in
 `features/environment.py`.  It defaults to the root of the repository so no additional
 configuration is required.
 
+## Running simulations
+
+The `When the simulation is run` step executes an end-to-end simulation for the feature selected
+by the preceding `Given the feature "<name>"` step.  It:
+
+1. Exports the KiCad netlist using `kicad-cli` via `export_netlist()` from `ci_feature/kicad_export.py`.
+2. Runs `ngspice` in batch mode on the exported netlist via `run_spice()` from `ci_feature/spice_runner.py`.
+3. Stores the :class:`SpiceResult` on `context.simulation_result` for use in subsequent `Then` assertion steps.
+
+```gherkin
+Feature: Voltage regulator simulation
+  @slow
+  Scenario: Output voltage within tolerance
+    Given the feature "voltage-regulator"
+    When the simulation is run
+    Then the simulation result is available
+```
+
+### Simulation output location
+
+Netlist files and ngspice logs are written to `reports/simulation/<feature-name>/` under the
+repository root.
+
+### Error handling
+
+Failures surface the specific exception raised by the underlying module so that the step failure
+message is immediately actionable:
+
+| Failure type | Exception class | Cause |
+|---|---|---|
+| `kicad-cli` not installed or failed | `NetlistExportError` | KiCad toolchain issue |
+| Missing SPICE model file | `MissingModelError` | Model library path in manifest does not exist |
+| Missing required parameter | `MissingParameterError` | Parameter listed in `models.required_parameters` absent from `configuration` |
+| ngspice convergence failure | `ConvergenceError` | Simulation did not converge |
+| Other ngspice failure | `SpiceRunError` | ngspice exited with a non-zero status |
+
+### Model and parameter pre-flight checks
+
+Before `ngspice` is invoked, the step validates:
+
+- All model library files listed in `manifest.models["libraries"]` exist on the filesystem
+  (checked by `validate_model_presence()` from `ci_feature/model_validation.py`).
+- All parameter names listed in `manifest.models["required_parameters"]` are present in
+  `manifest.configuration` (checked by `validate_required_parameters()` from
+  `ci_feature/spice_runner.py`).
+
+Both checks fail fast with a clear error before the subprocess is launched.
+
 ## CI integration
 
 The CI pipeline runs `behave` automatically on every pull request and push to `main`.  See [ci.md](ci.md) for details of the rest of the CI pipeline (currently focused on the pytest-based tests).
