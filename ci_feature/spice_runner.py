@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import os
+import re
 import shlex
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, Optional
 
 from ci_feature.model_validation import validate_model_presence
@@ -27,10 +28,54 @@ __all__ = [
     "SpiceRunError",
     "SpiceSyntaxError",
     "SpiceResult",
+    "parse_measure_results",
     "run_spice",
     "validate_model_presence",
     "validate_required_parameters",
 ]
+
+# Matches ngspice .meas result lines of the form:
+#   <name>   =   <float>
+# Names are case-insensitive in SPICE; this pattern captures them for
+# upper-casing by the caller.  The float allows optional sign, integer part,
+# decimal part, and exponent (e.g. 2.500000e+00, -1.2e-3, .5, 5).
+_MEAS_RESULT_RE = re.compile(
+    r"^\s*(\w+)\s*=\s*([-+]?\d*(?:\.\d+)?(?:[eE][-+]?\d+)?)",
+    re.MULTILINE,
+)
+
+
+def parse_measure_results(log_content: str) -> Dict[str, float]:
+    """Parse ngspice ``.meas`` result lines from simulation log output.
+
+    Scans *log_content* for lines produced by ngspice ```.meas``` directives,
+    which have the form::
+
+        <name>   =   <value>
+
+    and returns a mapping of **upper-cased** name to float value.  Names are
+    upper-cased so that they match interface signal names without requiring the
+    SPICE netlist to use a specific case (SPICE is case-insensitive).
+
+    Lines that do not match the pattern, or whose value cannot be converted to
+    a float, are silently skipped.
+
+    Args:
+        log_content: The full text content of the ngspice log file (i.e. the
+            file written by ``ngspice -b -o <log> <netlist>``).
+
+    Returns:
+        A ``dict`` mapping upper-cased measurement names to their float values.
+        Returns an empty dict when no matching lines are found.
+    """
+    results: Dict[str, float] = {}
+    for match in _MEAS_RESULT_RE.finditer(log_content):
+        name = match.group(1).upper()
+        try:
+            results[name] = float(match.group(2))
+        except ValueError:
+            pass
+    return results
 
 
 @dataclass
@@ -42,12 +87,16 @@ class SpiceResult:
         stdout: Captured standard output from ngspice.
         stderr: Captured standard error from ngspice.
         log_path: Absolute path to the ngspice log file written to *output_dir*.
+        signals: Mapping of upper-cased ``.meas`` measurement names to their
+            float values, parsed from the ngspice log file.  Empty when the
+            log file cannot be read or contains no ``name = value`` lines.
     """
 
     returncode: int
     stdout: str
     stderr: str
     log_path: str
+    signals: Dict[str, float] = field(default_factory=dict)
 
 
 def validate_required_parameters(
@@ -238,9 +287,17 @@ def run_spice(
     if result.returncode != 0:
         _raise_classified_error(result.returncode, result.stdout, result.stderr, cmd)
 
+    signals: Dict[str, float] = {}
+    try:
+        with open(log_path) as f:
+            signals = parse_measure_results(f.read())
+    except OSError:
+        pass
+
     return SpiceResult(
         returncode=result.returncode,
         stdout=result.stdout,
         stderr=result.stderr,
         log_path=log_path,
+        signals=signals,
     )
