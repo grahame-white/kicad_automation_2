@@ -58,7 +58,11 @@ jobs:
           fi
 
       # Run @fast-tagged scenarios first for quick fail-fast feedback.
+      # continue-on-error ensures the full suite still runs (and the HTML report
+      # is always produced), while the final check step re-fails the job if needed.
       - name: Run fast BDD scenarios
+        id: fast_bdd
+        continue-on-error: true
         run: behave --tags=@fast
 
       # Run the full suite (including @fast scenarios) for complete HTML reporting.
@@ -71,3 +75,11 @@ jobs:
         with:
           name: behave-reports
           path: reports/
+
+      # Fail the job here if the fast scenarios step failed, so CI status is
+      # still red even though the full suite and report upload ran to completion.
+      - name: Check fast BDD scenarios result
+        if: steps.fast_bdd.outcome == 'failure'
+        run: |
+          echo "Fast BDD scenarios failed. See the 'Run fast BDD scenarios' step for details."
+          exit 1
