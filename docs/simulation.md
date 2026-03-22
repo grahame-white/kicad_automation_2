@@ -49,7 +49,7 @@ expected to be **2.5 V**.
 from ci_feature.spice_runner import run_spice, SpiceRunError, SpiceResult
 
 try:
-    result: SpiceResult = run_spice("ci/fixtures/minimal.spice", "/tmp/spice_out")
+    result: SpiceResult = run_spice("ci/fixtures/minimal.spice", "/tmp/spice_out", timeout=60)
 except SpiceRunError as exc:
     print(f"Simulation failed: {exc}")
 else:
@@ -74,6 +74,7 @@ Raised when:
 - The netlist file does not exist.
 - `ngspice` is not installed or cannot be launched.
 - `ngspice` exits with a non-zero status code.
+- `ngspice` does not complete within the *timeout* seconds.
 
 The exception message always includes the attempted command and any captured
 stdout/stderr so failures are immediately actionable.

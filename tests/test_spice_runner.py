@@ -1,7 +1,9 @@
 """Unit tests for ci_feature.spice_runner."""
 
 import os
+import shutil
 import subprocess
+import tempfile
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -12,6 +14,9 @@ from ci_feature.spice_runner import SpiceResult, SpiceRunError, run_spice
 _NETLIST_PATH = "/tmp/ci/fixtures/minimal.spice"
 _OUTPUT_DIR = "/tmp/ci_workspace/spice"
 _LOG_PATH = f"{_OUTPUT_DIR}/ngspice.log"
+
+# Path to the known-good fixture shipped with the repository.
+_FIXTURE_NETLIST = os.path.join(os.path.dirname(__file__), "..", "ci", "fixtures", "minimal.spice")
 
 
 def _make_completed_process(returncode=0, stdout="", stderr=""):
@@ -136,6 +141,36 @@ def test_run_spice_passes_netlist_path(fs):
     assert_that(any(arg.endswith("minimal.spice") for arg in captured_cmd), equal_to(True))
 
 
+def test_run_spice_passes_timeout_to_subprocess(fs):
+    """run_spice() passes the timeout argument to subprocess.run."""
+    fs.create_file(_NETLIST_PATH, contents="* netlist\n.end\n")
+    captured_kwargs = {}
+
+    def fake_run(cmd, **kwargs):
+        captured_kwargs.update(kwargs)
+        return _make_completed_process(returncode=0)
+
+    with patch("ci_feature.spice_runner.subprocess.run", side_effect=fake_run):
+        run_spice(_NETLIST_PATH, _OUTPUT_DIR, timeout=120)
+
+    assert_that(captured_kwargs.get("timeout"), equal_to(120))
+
+
+def test_run_spice_default_timeout_is_sixty(fs):
+    """run_spice() uses a default timeout of 60 seconds."""
+    fs.create_file(_NETLIST_PATH, contents="* netlist\n.end\n")
+    captured_kwargs = {}
+
+    def fake_run(cmd, **kwargs):
+        captured_kwargs.update(kwargs)
+        return _make_completed_process(returncode=0)
+
+    with patch("ci_feature.spice_runner.subprocess.run", side_effect=fake_run):
+        run_spice(_NETLIST_PATH, _OUTPUT_DIR)
+
+    assert_that(captured_kwargs.get("timeout"), equal_to(60))
+
+
 # ---------------------------------------------------------------------------
 # Missing netlist
 # ---------------------------------------------------------------------------
@@ -147,6 +182,14 @@ def test_run_spice_raises_when_netlist_missing(fs):
         run_spice(_NETLIST_PATH, _OUTPUT_DIR)
 
     assert_that(str(exc_info.value), contains_string(_NETLIST_PATH))
+
+
+def test_run_spice_missing_netlist_error_includes_command(fs):
+    """SpiceRunError for missing netlist includes the would-be command."""
+    with pytest.raises(SpiceRunError) as exc_info:
+        run_spice(_NETLIST_PATH, _OUTPUT_DIR)
+
+    assert_that(str(exc_info.value), contains_string("ngspice"))
 
 
 def test_run_spice_missing_netlist_error_is_spice_run_error(fs):
@@ -288,3 +331,19 @@ def test_run_spice_raises_spice_run_error_on_timeout(fs):
             run_spice(_NETLIST_PATH, _OUTPUT_DIR)
 
     assert_that(str(exc_info.value), contains_string("ngspice"))
+
+
+# ---------------------------------------------------------------------------
+# Integration test — skipped when ngspice is not installed
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.skipif(shutil.which("ngspice") is None, reason="ngspice not installed")
+def test_run_spice_with_real_fixture():
+    """run_spice() succeeds against the known-good minimal fixture when ngspice is available."""
+    with tempfile.TemporaryDirectory() as output_dir:
+        result = run_spice(_FIXTURE_NETLIST, output_dir)
+
+    assert_that(result, instance_of(SpiceResult))
+    assert_that(result.returncode, equal_to(0))
+    assert_that(os.path.isfile(result.log_path), equal_to(True))

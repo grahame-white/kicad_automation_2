@@ -33,7 +33,7 @@ class SpiceResult:
     log_path: str
 
 
-def run_spice(netlist_path: str, output_dir: str) -> SpiceResult:
+def run_spice(netlist_path: str, output_dir: str, timeout: int = 60) -> SpiceResult:
     """Run ngspice on *netlist_path* and capture all output.
 
     Executes ``ngspice`` in batch mode (``-b``) on the given SPICE netlist,
@@ -44,6 +44,9 @@ def run_spice(netlist_path: str, output_dir: str) -> SpiceResult:
         netlist_path: Path to the SPICE netlist file to simulate.
         output_dir: Directory where the simulation log will be written.  The
             directory is created if it does not already exist.
+        timeout: Maximum number of seconds to wait for ngspice to complete.
+            Defaults to 60.  Raises :class:`SpiceRunError` if the process does
+            not finish within this time.
 
     Returns:
         A :class:`SpiceResult` containing the exit code, captured stdout,
@@ -51,17 +54,13 @@ def run_spice(netlist_path: str, output_dir: str) -> SpiceResult:
 
     Raises:
         SpiceRunError: If ``ngspice`` cannot be launched (e.g. not installed);
-            if ``ngspice`` exits with a non-zero status; or if *netlist_path*
-            does not exist.  Error messages include any captured stdout/stderr
-            and the command that was attempted.
+            if ``ngspice`` exits with a non-zero status; if *netlist_path*
+            does not exist; or if ``ngspice`` does not complete within
+            *timeout* seconds.  Error messages include the command that was
+            attempted and any captured stdout/stderr.
     """
     netlist_path = os.path.realpath(netlist_path)
     output_dir = os.path.realpath(output_dir)
-
-    if not os.path.isfile(netlist_path):
-        raise SpiceRunError(f"Netlist file not found: {netlist_path}")
-
-    os.makedirs(output_dir, exist_ok=True)
 
     log_path = os.path.join(output_dir, "ngspice.log")
 
@@ -73,8 +72,13 @@ def run_spice(netlist_path: str, output_dir: str) -> SpiceResult:
         netlist_path,
     ]
 
+    if not os.path.isfile(netlist_path):
+        raise SpiceRunError(f"Netlist file not found: {netlist_path}\nCommand: {shlex.join(cmd)}")
+
+    os.makedirs(output_dir, exist_ok=True)
+
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
     except (FileNotFoundError, OSError, subprocess.TimeoutExpired) as exc:
         raise SpiceRunError(
             f"Failed to run ngspice.\n"
