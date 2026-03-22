@@ -36,3 +36,24 @@ ERROR: kicad-cli not found. In CI, this should be provided by the 'Install toolc
 ```
 
 and exits with a non-zero status so that the CI job fails immediately rather than producing a cryptic error later.
+
+## Behavioural test reports
+
+After the **Run BDD scenarios** step completes (whether it passes or fails), the CI pipeline uploads the contents of the `reports/` directory as a downloadable artifact named **`behave-reports`**.
+
+### What is included
+
+| Path | Contents |
+|------|----------|
+| `reports/junit/` | JUnit XML files — one per feature file — produced by Behave's built-in JUnit formatter.  These are compatible with most CI report parsers and test-result viewers. |
+| `reports/behave-report.html` | Self-contained HTML report produced by `behave-html-formatter`.  Open the file in any browser for a colour-coded, collapsible view of features, scenarios and step outcomes. |
+
+### How to download the reports
+
+1. Open the **Actions** tab of the repository on GitHub.
+2. Select the workflow run of interest.
+3. Scroll to the **Artifacts** section at the bottom of the summary page.
+4. Click **`behave-reports`** to download the ZIP archive.
+5. Unzip, then:
+   - Open `behave-report.html` in any browser for the colour-coded, human-readable summary.
+   - Open the XML files under `junit/` in any JUnit-compatible viewer for tooling integration.
