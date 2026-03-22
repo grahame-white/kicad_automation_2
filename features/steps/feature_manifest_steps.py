@@ -1,7 +1,9 @@
 import json
 import os
+import textwrap
 
 import jsonschema
+import yaml
 from behave import given, then, when
 
 SCHEMA_PATH = os.path.join(
@@ -13,19 +15,39 @@ SCHEMA_PATH = os.path.join(
     "feature.schema.json",
 )
 
-VALID_MANIFEST = {
-    "name": "voltage-regulator",
-    "version": "1.0.0",
-    "schematic": "schematic/voltage-regulator.kicad_sch",
-    "interface": "interface.yml",
-    "models": {
-        "libraries": ["models/ldo.spice"],
-        "required_parameters": ["V_IN", "V_OUT"],
-    },
-    "configuration": {
-        "V_IN": 5.0,
-    },
-}
+VALID_MANIFEST_YAML = textwrap.dedent("""\
+    name: voltage-regulator
+    version: "1.0.0"
+    schematic: schematic/voltage-regulator.kicad_sch
+    interface: interface.yml
+    models:
+      libraries:
+        - models/ldo.spice
+      required_parameters:
+        - V_IN
+        - V_OUT
+    configuration:
+      V_IN: 5.0
+""")
+
+MANIFEST_MISSING_NAME_YAML = textwrap.dedent("""\
+    version: "1.0.0"
+    schematic: schematic/voltage-regulator.kicad_sch
+    interface: interface.yml
+    models:
+      libraries:
+        - models/ldo.spice
+      required_parameters:
+        - V_IN
+        - V_OUT
+""")
+
+MANIFEST_MISSING_MODELS_YAML = textwrap.dedent("""\
+    name: voltage-regulator
+    version: "1.0.0"
+    schematic: schematic/voltage-regulator.kicad_sch
+    interface: interface.yml
+""")
 
 
 @given("the feature manifest schema is loaded")
@@ -36,7 +58,7 @@ def step_load_schema(context):
 
 @when("a valid feature manifest is validated")
 def step_validate_valid_manifest(context):
-    context.manifest = VALID_MANIFEST.copy()
+    context.manifest = yaml.safe_load(VALID_MANIFEST_YAML)
     context.validation_error = None
     try:
         jsonschema.validate(instance=context.manifest, schema=context.schema)
@@ -46,7 +68,7 @@ def step_validate_valid_manifest(context):
 
 @when("a feature manifest missing the name field is validated")
 def step_validate_missing_name(context):
-    context.manifest = {k: v for k, v in VALID_MANIFEST.items() if k != "name"}
+    context.manifest = yaml.safe_load(MANIFEST_MISSING_NAME_YAML)
     context.validation_error = None
     try:
         jsonschema.validate(instance=context.manifest, schema=context.schema)
@@ -56,7 +78,7 @@ def step_validate_missing_name(context):
 
 @when("a feature manifest missing the models field is validated")
 def step_validate_missing_models(context):
-    context.manifest = {k: v for k, v in VALID_MANIFEST.items() if k != "models"}
+    context.manifest = yaml.safe_load(MANIFEST_MISSING_MODELS_YAML)
     context.validation_error = None
     try:
         jsonschema.validate(instance=context.manifest, schema=context.schema)
