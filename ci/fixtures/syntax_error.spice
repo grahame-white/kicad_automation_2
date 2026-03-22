@@ -1,0 +1,7 @@
+* Fixture that triggers a syntax/parse error
+* The .model line below contains an invalid syntax that ngspice cannot parse
+V1 in 0 DC 5V
+.model BROKEN_MODEL %%% invalid_syntax_here
+.dc V1 5 5 1
+.print dc V(in)
+.end
