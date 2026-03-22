@@ -95,10 +95,7 @@ def step_validation_succeeds(context):
 
 @then('validation fails with a clear error mentioning "{field}"')
 def step_validation_fails_mentioning(context, field):
-    assert context.validation_error is not None, (
-        "Expected validation to fail but it succeeded"
-    )
+    assert context.validation_error is not None, "Expected validation to fail but it succeeded"
     assert field in str(context.validation_error.message), (
-        f"Expected error message to mention '{field}', "
-        f"but got: {context.validation_error.message}"
+        f"Expected error message to mention '{field}', but got: {context.validation_error.message}"
     )

@@ -41,3 +41,9 @@ fp-info-cache
 
 # Behave report output (generated; not source-controlled)
 reports/
+
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+*.pyd

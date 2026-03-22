@@ -2,3 +2,12 @@
 paths = ["features"]
 junit = true
 junit_directory = "reports/junit"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]

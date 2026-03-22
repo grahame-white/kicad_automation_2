@@ -40,9 +40,51 @@ configuration:
   V_IN: 5.0
 ```
 
-## Validation
+## Python API
 
-Install the `jsonschema` Python library (already listed in `requirements.txt`), then run:
+Use `ci_feature.manifest.load_manifest()` to load and validate a manifest in one step:
+
+```python
+from ci_feature.manifest import load_manifest, ManifestValidationError
+
+manifest = load_manifest("path/to/feature.yml")
+print(manifest.name)        # e.g. "voltage-regulator"
+print(manifest.version)     # e.g. "1.0.0"
+print(manifest.schematic)   # e.g. "schematic/voltage-regulator.kicad_sch"
+print(manifest.interface)   # e.g. "interface.yml"
+print(manifest.models)      # dict with "libraries" and "required_parameters"
+print(manifest.configuration)  # dict of defaults, or None if omitted
+```
+
+### Validation errors
+
+`load_manifest()` raises descriptive exceptions for every failure mode:
+
+| Situation | Exception | Example message |
+|-----------|-----------|-----------------|
+| File does not exist | `FileNotFoundError` | `Manifest file not found: path/to/feature.yml` |
+| Malformed YAML | `ManifestValidationError` | `Failed to parse YAML in path/to/feature.yml: …` |
+| Missing required field | `ManifestValidationError` | `Manifest validation failed: 'name' is a required property` |
+| Invalid field value | `ManifestValidationError` | `Manifest validation failed: …` |
+
+Example — handling errors:
+
+```python
+from ci_feature.manifest import load_manifest, ManifestValidationError
+
+try:
+    manifest = load_manifest("path/to/feature.yml")
+except FileNotFoundError as exc:
+    print(f"File not found: {exc}")
+except ManifestValidationError as exc:
+    print(f"Invalid manifest: {exc}")
+```
+
+## Low-level validation
+
+You can also validate a manifest dict directly against the JSON Schema at
+[`ci/schemas/feature.schema.json`](../ci/schemas/feature.schema.json) using
+`jsonschema`:
 
 ```python
 import json
