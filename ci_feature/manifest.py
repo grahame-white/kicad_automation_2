@@ -7,6 +7,15 @@ from typing import Any, Dict, Optional
 import jsonschema
 import yaml
 
+from ci_feature.isolation import IsolationViolationError, validate_isolation
+
+__all__ = [
+    "FeatureManifest",
+    "IsolationViolationError",
+    "ManifestValidationError",
+    "load_manifest",
+]
+
 SCHEMA_PATH = os.path.realpath(
     os.path.join(
         os.path.dirname(__file__),
@@ -54,6 +63,9 @@ def load_manifest(path: str) -> FeatureManifest:
         ManifestValidationError: If the file contains malformed YAML or if the
             parsed data does not satisfy the JSON Schema.  The message includes
             the name of the failing field or a YAML parse description.
+        IsolationViolationError: If any path in the manifest is absolute or resolves
+            outside the feature's directory subtree.  The message names the offending
+            field and path and explains the isolation rule.
     """
     if not os.path.isfile(path):
         raise FileNotFoundError(f"Manifest file not found: {path}")
@@ -94,6 +106,9 @@ def load_manifest(path: str) -> FeatureManifest:
             message = f"Manifest validation failed: {exc.message}"
 
         raise ManifestValidationError(message) from exc
+
+    feature_dir = os.path.dirname(os.path.realpath(path))
+    validate_isolation(feature_dir, data)
 
     return FeatureManifest(
         name=data["name"],
