@@ -234,3 +234,35 @@ def test_validate_required_parameters_importable_from_spice_runner():
     from ci_feature.spice_runner import validate_required_parameters as vrp
 
     assert_that(callable(vrp), equal_to(True))
+
+
+# ---------------------------------------------------------------------------
+# Duplicate required parameters — de-duplicated before reporting
+# ---------------------------------------------------------------------------
+
+
+def test_validate_required_parameters_deduplicates_required_list():
+    """Duplicate entries in required_parameters are counted only once."""
+    manifest = _FakeManifest(
+        name="voltage-regulator",
+        models={"libraries": [], "required_parameters": ["V_IN", "V_IN"]},
+    )
+
+    with pytest.raises(MissingParameterError) as exc_info:
+        validate_required_parameters(manifest, {})
+
+    error_msg = str(exc_info.value)
+    # Should report 1 missing parameter, not 2
+    assert_that(error_msg, contains_string("1 required parameter"))
+
+
+def test_validate_required_parameters_passes_with_duplicate_required_when_provided():
+    """Duplicate entries in required_parameters pass when the parameter is provided once."""
+    manifest = _FakeManifest(
+        name="voltage-regulator",
+        models={"libraries": [], "required_parameters": ["V_IN", "V_IN"]},
+    )
+
+    result = validate_required_parameters(manifest, {"V_IN": 5.0})
+
+    assert_that(result, equal_to(None))

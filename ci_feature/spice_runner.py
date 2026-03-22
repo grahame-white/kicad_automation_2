@@ -76,7 +76,7 @@ def validate_required_parameters(
             *provided_params*.  The error message includes the feature name and the
             full list of missing parameter names.
     """
-    required = manifest.models.get("required_parameters", [])
+    required = list(dict.fromkeys(manifest.models.get("required_parameters", [])))
     provided = set(provided_params.keys()) if provided_params else set()
     missing = [p for p in required if p not in provided]
 
