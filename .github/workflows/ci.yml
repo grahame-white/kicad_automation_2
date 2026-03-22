@@ -24,6 +24,20 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Check toolchain presence
+        run: |
+          command -v kicad-cli \
+            || { echo "ERROR: kicad-cli not found. Please install KiCad (https://www.kicad.org/download/)."; exit 1; }
+          kicad-cli --version
+
+          command -v ngspice \
+            || { echo "ERROR: ngspice not found. Please install ngspice (https://ngspice.sourceforge.io/)."; exit 1; }
+          ngspice --version
+
+          command -v python \
+            || { echo "ERROR: python not found. Please install Python 3 (https://www.python.org/downloads/)."; exit 1; }
+          python --version
+
       - name: Install dependencies
         run: |
           if [ -f requirements.txt ]; then
