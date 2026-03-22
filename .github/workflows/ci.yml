@@ -58,7 +58,7 @@ jobs:
           fi
 
       - name: Run BDD scenarios
-        run: behave
+        run: behave -f behave_html_formatter:HTMLFormatter -o reports/behave-report.html
 
       - name: Upload behave reports
         if: always()
