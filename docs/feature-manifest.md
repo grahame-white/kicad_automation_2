@@ -100,8 +100,8 @@ except ManifestValidationError as exc:
 ## Model library rules
 
 Every path listed under `models.libraries` must exist on the filesystem before ngspice is
-invoked. CI enforces this rule by calling
-`ci_feature.model_validation.validate_model_presence()` as a pre-flight check.
+invoked. Pass the manifest and its directory to `run_spice()` to enforce this automatically,
+or call `ci_feature.model_validation.validate_model_presence()` directly as a pre-flight check.
 
 ### Behaviour
 
@@ -113,7 +113,27 @@ invoked. CI enforces this rule by calling
   - The feature name.
   - The full absolute path of every missing file.
 
-### Example
+### Enforcement via `run_spice()`
+
+When `manifest` and `feature_dir` are supplied to `run_spice()`, the pre-flight check runs
+automatically before the ngspice subprocess is launched:
+
+```python
+from ci_feature.manifest import load_manifest
+from ci_feature.spice_runner import run_spice
+from ci_feature.spice_errors import MissingModelError
+import os
+
+manifest = load_manifest("path/to/feature.yml")
+feature_dir = os.path.dirname(os.path.realpath("path/to/feature.yml"))
+
+# validate_model_presence is called automatically before ngspice starts
+result = run_spice("path/to/netlist.spice", "path/to/output", manifest=manifest, feature_dir=feature_dir)
+```
+
+### Standalone enforcement
+
+`validate_model_presence()` can also be called directly:
 
 ```python
 from ci_feature.manifest import load_manifest

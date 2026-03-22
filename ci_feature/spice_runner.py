@@ -1,9 +1,12 @@
 """ngspice runner for SPICE netlist simulation."""
 
+from __future__ import annotations
+
 import os
 import shlex
 import subprocess
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, Optional
 
 from ci_feature.model_validation import validate_model_presence
 from ci_feature.spice_errors import (
@@ -12,6 +15,9 @@ from ci_feature.spice_errors import (
     SpiceRunError,
     SpiceSyntaxError,
 )
+
+if TYPE_CHECKING:
+    from ci_feature.manifest import FeatureManifest
 
 __all__ = [
     "ConvergenceError",
@@ -77,12 +83,24 @@ def _raise_classified_error(returncode: int, stdout: str, stderr: str, cmd: list
     raise SpiceRunError(msg)
 
 
-def run_spice(netlist_path: str, output_dir: str, timeout: int = 60) -> SpiceResult:
+def run_spice(
+    netlist_path: str,
+    output_dir: str,
+    timeout: int = 60,
+    manifest: Optional[FeatureManifest] = None,
+    feature_dir: Optional[str] = None,
+) -> SpiceResult:
     """Run ngspice on *netlist_path* and capture all output.
 
     Executes ``ngspice`` in batch mode (``-b``) on the given SPICE netlist,
     writing a log file to *output_dir* and returning a :class:`SpiceResult`
     with the captured stdout, stderr, and log path.
+
+    When *manifest* and *feature_dir* are provided, every model library path
+    listed in ``manifest.models["libraries"]`` is verified to exist before
+    ngspice is launched.  If any file is absent, :class:`MissingModelError`
+    is raised immediately — before the subprocess starts — so CI fails fast
+    with a clear, actionable error.
 
     Args:
         netlist_path: Path to the SPICE netlist file to simulate.
@@ -91,21 +109,28 @@ def run_spice(netlist_path: str, output_dir: str, timeout: int = 60) -> SpiceRes
         timeout: Maximum number of seconds to wait for ngspice to complete.
             Defaults to 60.  Raises :class:`SpiceRunError` if the process does
             not finish within this time.
+        manifest: Optional :class:`~ci_feature.manifest.FeatureManifest`
+            whose ``models["libraries"]`` paths are checked for existence before
+            ngspice is invoked.  Must be supplied together with *feature_dir*.
+        feature_dir: Directory containing the ``feature.yml`` file; used to
+            resolve model library paths from *manifest* to absolute paths.
+            Required when *manifest* is provided.
 
     Returns:
         A :class:`SpiceResult` containing the exit code, captured stdout,
         captured stderr, and the path to the written log file.
 
     Raises:
+        ValueError: If *manifest* is provided without *feature_dir*.
+        MissingModelError: If *manifest* is supplied and one or more model
+            library files listed in ``manifest.models["libraries"]`` do not
+            exist on the filesystem (raised before ngspice is invoked).
         SpiceRunError: If ``ngspice`` cannot be launched (e.g. not installed);
             if ``ngspice`` does not complete within *timeout* seconds; if
             *netlist_path* does not exist; or if ``ngspice`` exits with a
             non-zero status that does not match any known error pattern.
             Error messages include the command that was attempted and any
             captured stdout/stderr.
-        MissingModelError: If ngspice output indicates a missing model or
-            include file (raised instead of :class:`SpiceRunError` when a
-            non-zero exit is classified as a missing-model error).
         SpiceSyntaxError: If ngspice output indicates a syntax or parse error
             in the netlist (raised instead of :class:`SpiceRunError` when a
             non-zero exit is classified as a syntax error).
@@ -113,6 +138,11 @@ def run_spice(netlist_path: str, output_dir: str, timeout: int = 60) -> SpiceRes
             failure (raised instead of :class:`SpiceRunError` when a non-zero
             exit is classified as a convergence error).
     """
+    if manifest is not None:
+        if feature_dir is None:
+            raise ValueError("feature_dir must be provided when manifest is provided")
+        validate_model_presence(manifest, feature_dir)
+
     netlist_path = os.path.realpath(netlist_path)
     output_dir = os.path.realpath(output_dir)
 

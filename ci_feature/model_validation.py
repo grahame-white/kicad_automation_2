@@ -1,13 +1,19 @@
 """Validation helpers for SPICE model file presence."""
 
+from __future__ import annotations
+
 import os
+from typing import TYPE_CHECKING
 
 from ci_feature.spice_errors import MissingModelError
+
+if TYPE_CHECKING:
+    from ci_feature.manifest import FeatureManifest
 
 __all__ = ["validate_model_presence"]
 
 
-def validate_model_presence(manifest, feature_dir: str) -> None:
+def validate_model_presence(manifest: FeatureManifest, feature_dir: str) -> None:
     """Check that all SPICE model libraries declared in *manifest* exist.
 
     Resolves each path in ``manifest.models["libraries"]`` relative to
@@ -21,6 +27,7 @@ def validate_model_presence(manifest, feature_dir: str) -> None:
             whose ``models["libraries"]`` paths will be verified.
         feature_dir: The directory containing the ``feature.yml`` manifest.
             Model library paths are resolved relative to this directory.
+            The path is normalised with :func:`os.path.realpath` before use.
 
     Raises:
         MissingModelError: If one or more model library files do not exist.
@@ -28,6 +35,7 @@ def validate_model_presence(manifest, feature_dir: str) -> None:
             missing absolute paths.
     """
     libraries = manifest.models.get("libraries", [])
+    feature_dir = os.path.realpath(feature_dir)
     missing = []
 
     for lib in libraries:

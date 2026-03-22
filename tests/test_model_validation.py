@@ -118,7 +118,8 @@ def test_validate_model_presence_error_includes_missing_path(fs):
     with pytest.raises(MissingModelError) as exc_info:
         validate_model_presence(manifest, _FEATURE_DIR)
 
-    assert_that(str(exc_info.value), contains_string("missing.spice"))
+    missing_path = f"{_FEATURE_DIR}/models/missing.spice"
+    assert_that(str(exc_info.value), contains_string(missing_path))
 
 
 def test_validate_model_presence_error_is_missing_model_error(fs):
