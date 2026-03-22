@@ -1,0 +1,8 @@
+* Fixture that triggers a missing model/include error
+* ngspice cannot open the referenced include file
+.include "nonexistent_model.lib"
+V1 in 0 DC 5V
+R1 in out 1k
+.dc V1 5 5 1
+.print dc V(out)
+.end

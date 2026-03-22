@@ -5,15 +5,21 @@ import shlex
 import subprocess
 from dataclasses import dataclass
 
+from ci_feature.spice_errors import (
+    ConvergenceError,
+    MissingModelError,
+    SpiceRunError,
+    SpiceSyntaxError,
+)
+
 __all__ = [
+    "ConvergenceError",
+    "MissingModelError",
     "SpiceRunError",
+    "SpiceSyntaxError",
     "SpiceResult",
     "run_spice",
 ]
-
-
-class SpiceRunError(Exception):
-    """Raised when ngspice execution fails or cannot be launched."""
 
 
 @dataclass
@@ -31,6 +37,42 @@ class SpiceResult:
     stdout: str
     stderr: str
     log_path: str
+
+
+def _raise_classified_error(returncode: int, stdout: str, stderr: str, cmd: list[str]) -> None:
+    """Inspect ngspice output and raise the most specific exception type.
+
+    Examines *stdout* and *stderr* for well-known ngspice error patterns and
+    raises the appropriate typed exception.  Falls back to :class:`SpiceRunError`
+    when no recognised pattern is found.
+
+    Args:
+        returncode: The non-zero exit code returned by ngspice.
+        stdout: Captured standard output from the failed ngspice process.
+        stderr: Captured standard error from the failed ngspice process.
+        cmd: The command list that was executed, used in the error message.
+
+    Raises:
+        MissingModelError: When output contains ``include not found``.
+        SpiceSyntaxError: When output contains ``parse error`` or ``syntax error``.
+        ConvergenceError: When output contains ``no convergence`` or
+            ``timestep too small``.
+        SpiceRunError: For all other non-zero exit codes.
+    """
+    combined = f"{stdout}\n{stderr}".lower()
+    msg = (
+        f"ngspice failed (exit code {returncode}).\n"
+        f"Command: {shlex.join(cmd)}\n"
+        f"stdout: {stdout}\n"
+        f"stderr: {stderr}"
+    )
+    if "include not found" in combined:
+        raise MissingModelError(msg)
+    if "parse error" in combined or "syntax error" in combined:
+        raise SpiceSyntaxError(msg)
+    if "no convergence" in combined or "timestep too small" in combined:
+        raise ConvergenceError(msg)
+    raise SpiceRunError(msg)
 
 
 def run_spice(netlist_path: str, output_dir: str, timeout: int = 60) -> SpiceResult:
@@ -54,10 +96,20 @@ def run_spice(netlist_path: str, output_dir: str, timeout: int = 60) -> SpiceRes
 
     Raises:
         SpiceRunError: If ``ngspice`` cannot be launched (e.g. not installed);
-            if ``ngspice`` exits with a non-zero status; if *netlist_path*
-            does not exist; or if ``ngspice`` does not complete within
-            *timeout* seconds.  Error messages include the command that was
-            attempted and any captured stdout/stderr.
+            if ``ngspice`` does not complete within *timeout* seconds; if
+            *netlist_path* does not exist; or if ``ngspice`` exits with a
+            non-zero status that does not match any known error pattern.
+            Error messages include the command that was attempted and any
+            captured stdout/stderr.
+        MissingModelError: If ngspice output indicates a missing model or
+            include file (raised instead of :class:`SpiceRunError` when a
+            non-zero exit is classified as a missing-model error).
+        SpiceSyntaxError: If ngspice output indicates a syntax or parse error
+            in the netlist (raised instead of :class:`SpiceRunError` when a
+            non-zero exit is classified as a syntax error).
+        ConvergenceError: If ngspice output indicates a simulation convergence
+            failure (raised instead of :class:`SpiceRunError` when a non-zero
+            exit is classified as a convergence error).
     """
     netlist_path = os.path.realpath(netlist_path)
     output_dir = os.path.realpath(output_dir)
@@ -94,12 +146,7 @@ def run_spice(netlist_path: str, output_dir: str, timeout: int = 60) -> SpiceRes
         raise SpiceRunError(message) from exc
 
     if result.returncode != 0:
-        raise SpiceRunError(
-            f"ngspice failed (exit code {result.returncode}).\n"
-            f"Command: {shlex.join(cmd)}\n"
-            f"stdout: {result.stdout}\n"
-            f"stderr: {result.stderr}"
-        )
+        _raise_classified_error(result.returncode, result.stdout, result.stderr, cmd)
 
     return SpiceResult(
         returncode=result.returncode,
