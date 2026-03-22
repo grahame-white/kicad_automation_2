@@ -13,6 +13,6 @@ The CI pipeline runs on every pull request and on every push to the `main` branc
 
 ### Design decisions
 
-- All GitHub Actions are pinned to a full commit SHA to prevent supply-chain attacks.
+- All GitHub Actions used in the CI workflow are pinned to a full commit SHA to prevent supply-chain attacks.
 - Top-level workflow permissions are set to `none`; individual jobs request only what they need (`contents: read`).
 - Dependabot is configured to keep GitHub Actions dependencies up to date automatically.
