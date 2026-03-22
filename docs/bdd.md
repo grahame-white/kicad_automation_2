@@ -57,6 +57,43 @@ behave
 
 3. **Verify locally** – run `behave` and confirm all scenarios pass before opening a pull request.
 
+## Scenario tags (`@fast` / `@slow`)
+
+Scenarios can be tagged to control execution order and filtering.
+
+| Tag | Meaning | When to use |
+|-----|---------|-------------|
+| `@fast` | Lightweight, no external tooling required | Unit-style checks, trivial pass/fail scenarios |
+| `@slow` | Long-running, requires KiCad/SPICE toolchain | Full simulation or export scenarios |
+
+Tag a scenario by placing the tag on the line immediately above the `Scenario:` keyword:
+
+```gherkin
+Feature: My feature
+  @fast
+  Scenario: Quick sanity check
+    Given the system is ready
+    When nothing happens
+    Then the result is as expected
+```
+
+### Running tagged scenarios locally
+
+```bash
+# Run only fast scenarios
+behave --tags=@fast
+
+# Run only slow scenarios
+behave --tags=@slow
+
+# Exclude slow scenarios
+behave --tags=~@slow
+```
+
+### CI tag ordering
+
+The CI pipeline runs `@fast` scenarios in a dedicated step **before** the full suite.  This ensures that fundamental errors are caught quickly, without waiting for long-running simulations to finish.
+
 ## CI integration
 
 The CI pipeline runs `behave` automatically on every pull request and push to `main`.  See [ci.md](ci.md) for details of the rest of the CI pipeline (currently focused on the pytest-based tests).
