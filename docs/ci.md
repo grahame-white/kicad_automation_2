@@ -4,7 +4,15 @@
 
 The CI pipeline runs on every pull request and on every push to the `main` branch.
 
-It is structured as two sequential jobs: `fast-check` and `full-suite`. See [Fail-fast gating](#fail-fast-gating) for details.
+It is structured as the following jobs.  See [Fail-fast gating](#fail-fast-gating) and
+[Parallel execution / matrix sharding](#parallel-execution--matrix-sharding) for details.
+
+| Job | Trigger | Purpose |
+|-----|---------|---------|
+| `fast-check` | all events | Unit tests + `@fast` BDD scenarios (quick gate) |
+| `generate-matrix` | all events (after `fast-check`) | Discovers feature directories and emits the Actions matrix |
+| `run-feature` | all events (after `generate-matrix`) | Runs each feature's BDD scenarios in a separate parallel job |
+| `full-suite` | **`main` push only** (after `fast-check`) | Runs the complete Behave suite with HTML reporting |
 
 ### `fast-check` job steps
 
@@ -12,9 +20,13 @@ It is structured as two sequential jobs: `fast-check` and `full-suite`. See [Fai
 2. **Set up Python** – installs the specified Python version (3.12).
 3. **Shared CI setup** – runs `.github/actions/ci-setup` (composite action) which installs the KiCad/ngspice toolchain, checks tool presence, and installs Python dependencies.  See [Toolchain requirements](#toolchain-requirements).
 4. **Run tests** – executes `pytest -q` to run the unit test suite under `tests/`.  Exit code 5 ("no tests collected") is treated as success to allow the step to pass on a fresh checkout before any test files are added.
-5. **Run fast BDD scenarios** – executes `behave --tags=@fast` to run only the `@fast`-tagged scenarios.  Failures here block the `full-suite` job from running.
+5. **Run fast BDD scenarios** – executes `behave --tags=@fast` to run only the `@fast`-tagged scenarios.  Failures here block all downstream jobs from running.
 
 ### `full-suite` job steps
+
+> **Note:** `full-suite` only runs on pushes to `main` (not on pull requests).  PRs use the
+> parallel `run-feature` matrix jobs instead.  This avoids running the full BDD suite twice
+> on every PR.
 
 1. **Checkout** – checks out the repository at the triggering commit.
 2. **Set up Python** – installs the specified Python version (3.12).
@@ -33,18 +45,23 @@ It is structured as two sequential jobs: `fast-check` and `full-suite`. See [Fai
 The CI pipeline uses a two-stage approach to give quick feedback on fundamental errors before investing time in the full simulation suite.
 
 ```
-fast-check  ──►  full-suite
+                                  ┌─► generate-matrix ──► run-feature (×N, parallel)
+fast-check ──────────────────────►┤
+                                  └─► full-suite  (main push only)
 ```
 
-- **`fast-check`** runs `behave --tags=@fast` (plus `pytest`).  These scenarios are tagged `@fast` because they complete quickly and cover the most critical paths.  If any `@fast` scenario fails, the job fails immediately and the `full-suite` job is **blocked** from running.
-- **`full-suite`** depends on `fast-check` via `needs: fast-check`.  It only starts if `fast-check` passes, then runs the complete Behave suite and uploads the HTML report as part of the `reports/` artifact.
+- **`fast-check`** runs `behave --tags=@fast` (plus `pytest`).  These scenarios are tagged `@fast` because they complete quickly and cover the most critical paths.  If any `@fast` scenario fails, the job fails immediately and all downstream jobs (`generate-matrix`, `run-feature`, `full-suite`) are **blocked** from running.
+- **`generate-matrix`** depends on `fast-check` via `needs: fast-check`.  It only starts if `fast-check` passes, then computes the feature matrix for the parallel shards.
+- **`run-feature`** fans out over the matrix; one job per feature directory, all running in parallel.
+- **`full-suite`** depends on `fast-check` via `needs: fast-check` and is additionally gated to **`main` push only**.  It runs the complete Behave suite and uploads the HTML report as part of the `reports/` artifact.
 
 This means:
 
 - A broken fundamental always fails the PR quickly, without waiting for the full (slower) simulation suite.
-- The full suite only consumes runner resources when the fast scenarios are healthy.
-- CI output clearly shows two separate stages so it is easy to see at a glance which stage failed.
-- When `fast-check` is red, `full-suite` never runs, so no `reports/` artifact (including `behave-report.html`) will be generated or uploaded for that run.
+- PRs run each feature's scenarios in parallel (via `run-feature` shards) — no redundant serial re-run.
+- The HTML report (`full-suite`) only consumes runner resources on merges to `main`.
+- CI output clearly shows separate stages so it is easy to see at a glance which stage failed.
+- When `fast-check` is red, no downstream jobs run, so no `reports/` artifact will be generated or uploaded for that run.
 
 ## Toolchain requirements
 
@@ -174,9 +191,94 @@ netlist_path = export_netlist(manifest, output_dir="/tmp/ci_workspace", feature_
 - If the expected output file is missing or empty after a successful `kicad-cli`
   run, a `NetlistExportError` is raised with the expected file path.
 
+## Parallel execution / matrix sharding
+
+The CI pipeline runs each feature's BDD scenarios as a separate parallel job using a GitHub
+Actions matrix strategy.  This scales execution time roughly linearly with the number of
+available runners rather than the number of features.
+
+On **pull requests** the `run-feature` matrix jobs are the only BDD execution — the serial
+`full-suite` job is skipped.  On **`main` pushes** both the matrix shards and `full-suite`
+run (in parallel after `fast-check`), so the consolidated HTML report is produced for every
+merged commit without re-running scenarios a second time on PRs.
+
+### How it works
+
+1. **`generate-matrix`** — runs immediately after `fast-check`.  It executes
+   `python ci/generate_matrix.py`, which calls `discover_features()` and outputs a JSON array
+   of feature directory paths relative to the repository root (for example
+   `["features/voltage-regulator", "features/current-sensor"]`).  The array is captured in a
+   job output called `matrix`.
+
+2. **`run-feature`** — fans out over the matrix produced by `generate-matrix`.  One runner is
+   allocated per feature directory.  Each runner:
+   - Checks out the repository.
+   - Installs the full toolchain and Python dependencies via the shared `ci-setup` action.
+   - Runs `behave <feature-dir>/` to execute only the scenarios belonging to that shard.
+   - Uploads the JUnit XML files from `reports/junit/` as a per-shard artifact named
+     `junit-<job-index>` (uploaded even when the step fails, via `if: always()`).
+
+3. **Failure propagation** — `strategy.fail-fast` is set to `false` so that all shards run to
+   completion even when one fails, giving a full picture of the test results.  Because each
+   shard is its own job, GitHub marks the overall workflow run as failed if *any* shard fails.
+
+### `ci/generate_matrix.py`
+
+The `generate_matrix(root_path)` function in `ci/generate_matrix.py` can also be imported
+directly in Python:
+
+```python
+from ci.generate_matrix import generate_matrix
+
+paths = generate_matrix(root_path="/repo")
+# Returns: ["features/voltage-regulator", ...] sorted alphabetically
+```
+
+When run as a script it prints the JSON array to stdout:
+
+```bash
+python ci/generate_matrix.py
+# ["features/current-sensor", "features/voltage-regulator"]
+```
+
+An optional positional argument overrides the default repository root (the parent directory of
+the script):
+
+```bash
+python ci/generate_matrix.py /path/to/repo
+```
+
+### Per-shard JUnit reports
+
+Each `run-feature` job uploads its JUnit XML files as a separate artifact.  Artifact names
+follow the pattern `junit-<job-index>` where `<job-index>` is the zero-based position of the
+shard within the matrix (provided by `strategy.job-index`).
+
+To download and inspect the reports:
+
+1. Open the **Actions** tab of the repository on GitHub.
+2. Select the workflow run of interest.
+3. Scroll to the **Artifacts** section.
+4. Download the `junit-<N>` artifact for the shard you want to inspect.
+5. Extract the ZIP and open the XML files in any JUnit-compatible viewer.
+
+### Design decisions
+
+- **`fail-fast: false`** — ensures all shards run to completion so you get the full failure
+  picture in one workflow run rather than having to re-run after fixing each shard in turn.
+- **`if: ${{ needs.generate-matrix.outputs.matrix != '[]' }}`** — skips the `run-feature` job
+  entirely when no features are discovered, avoiding a matrix-with-empty-array error.
+- **Artifact naming** — uses `strategy.job-index` rather than the feature path to avoid
+  artifact-name collisions caused by special characters in directory paths.
+
 ## Behavioural test reports
 
-After the **Run BDD scenarios** step completes (whether it passes or fails), the CI pipeline uploads the contents of the `reports/` directory as a downloadable artifact named **`behave-reports`**.
+After the **Run BDD scenarios** step in the `full-suite` job completes (whether it passes or fails), the CI pipeline uploads the contents of the `reports/` directory as a downloadable artifact named **`behave-reports`**.
+
+> **Note:** Because `full-suite` only runs on pushes to `main`, the `behave-reports` artifact
+> (including `behave-report.html`) is **not** generated on pull requests.  Per-shard JUnit XML
+> reports are available on every run via the `junit-<N>` artifacts uploaded by the
+> `run-feature` matrix jobs.
 
 ### What is included
 
