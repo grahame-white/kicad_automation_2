@@ -2,7 +2,7 @@ import functools
 import json
 import os
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import jsonschema
 import yaml
@@ -45,7 +45,7 @@ class FeatureManifest:
     name: str
     version: str
     schematic: str
-    interface: str
+    interface: List[str]
     models: Dict[str, Any]
     configuration: Optional[Dict[str, Any]] = None
 
@@ -112,23 +112,30 @@ def load_manifest(path: str) -> FeatureManifest:
     feature_dir = os.path.dirname(os.path.realpath(path))
     validate_isolation(feature_dir, data)
 
-    interface_path = os.path.join(feature_dir, data["interface"])
-    try:
-        load_interface(interface_path)
-    except FileNotFoundError:
-        raise ManifestValidationError(
-            f"Feature '{data['name']}' references interface '{interface_path}' which does not exist"
-        ) from None
-    except InterfaceValidationError as exc:
-        raise ManifestValidationError(
-            f"Feature '{data['name']}' has invalid interface '{interface_path}': {exc}"
-        ) from exc
+    # Normalise the interface field to a list regardless of whether the YAML
+    # declared a single string or an array, so callers always see List[str].
+    raw_interface = data["interface"]
+    interfaces: List[str] = [raw_interface] if isinstance(raw_interface, str) else raw_interface
+
+    for iface_rel_path in interfaces:
+        interface_path = os.path.join(feature_dir, iface_rel_path)
+        try:
+            load_interface(interface_path)
+        except FileNotFoundError:
+            raise ManifestValidationError(
+                f"Feature '{data['name']}' references interface '{interface_path}' "
+                f"which does not exist"
+            ) from None
+        except InterfaceValidationError as exc:
+            raise ManifestValidationError(
+                f"Feature '{data['name']}' has invalid interface '{interface_path}': {exc}"
+            ) from exc
 
     return FeatureManifest(
         name=data["name"],
         version=data["version"],
         schematic=data["schematic"],
-        interface=data["interface"],
+        interface=interfaces,
         models=data["models"],
         configuration=data.get("configuration"),
     )

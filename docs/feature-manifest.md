@@ -13,7 +13,7 @@ The manifest is validated against the JSON Schema at [`ci/schemas/feature.schema
 | `name` | string | Unique feature identifier. |
 | `version` | string | Semantic version (e.g. `"1.0.0"`). |
 | `schematic` | string | Relative path to the KiCad schematic file. |
-| `interface` | string | Relative path to `interface.yml`. |
+| `interface` | string or array of strings | Relative path(s) to `interface.yml` file(s). Use a list when the feature satisfies multiple interface contracts. |
 | `models.libraries` | array of strings | Relative paths to SPICE model files. |
 | `models.required_parameters` | array of strings | Parameter names that must be supplied at runtime. |
 
@@ -40,6 +40,23 @@ configuration:
   V_IN: 5.0
 ```
 
+When a feature satisfies more than one interface contract, declare them as a list:
+
+```yaml
+name: voltage-regulator
+version: "1.0.0"
+schematic: schematic/voltage-regulator.kicad_sch
+interface:
+  - interface.yml
+  - thermal-interface.yml
+models:
+  libraries:
+    - models/ldo.spice
+  required_parameters:
+    - V_IN
+    - V_OUT
+```
+
 ## Python API
 
 Use `ci_feature.manifest.load_manifest()` to load and validate a manifest in one step:
@@ -51,7 +68,7 @@ manifest = load_manifest("path/to/feature.yml")
 print(manifest.name)        # e.g. "voltage-regulator"
 print(manifest.version)     # e.g. "1.0.0"
 print(manifest.schematic)   # e.g. "schematic/voltage-regulator.kicad_sch"
-print(manifest.interface)   # e.g. "interface.yml"
+print(manifest.interface)   # e.g. ["interface.yml"] (always a list, even for a single entry)
 print(manifest.models)      # dict with "libraries" and "required_parameters"
 print(manifest.configuration)  # dict of defaults, or None if omitted
 ```

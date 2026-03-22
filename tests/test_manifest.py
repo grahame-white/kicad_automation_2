@@ -77,7 +77,7 @@ def test_load_valid_manifest(fake_fs):
     assert_that(manifest.name, equal_to("voltage-regulator"))
     assert_that(manifest.version, equal_to("1.0.0"))
     assert_that(manifest.schematic, equal_to("schematic/voltage-regulator.kicad_sch"))
-    assert_that(manifest.interface, equal_to("interface.yml"))
+    assert_that(manifest.interface, equal_to(["interface.yml"]))
     assert_that(manifest.models["libraries"], equal_to(["models/ldo.spice"]))
     assert_that(manifest.models["required_parameters"], equal_to(["V_IN", "V_OUT"]))
     assert_that(manifest.configuration, equal_to({"V_IN": 5.0}))
@@ -204,3 +204,63 @@ def test_invalid_interface_file_raises_manifest_validation_error(fake_fs):
     message = str(exc_info.value)
     assert_that(message, contains_string("voltage-regulator"))
     assert_that(message, contains_string("interface.yml"))
+
+
+def test_list_interface_all_valid_loads_successfully(fake_fs):
+    """A manifest declaring multiple interfaces loads when all interface files are valid."""
+    fake_fs.create_file(
+        _MANIFEST_PATH,
+        contents=textwrap.dedent("""\
+            name: voltage-regulator
+            version: "1.0.0"
+            schematic: schematic/voltage-regulator.kicad_sch
+            interface:
+              - interface.yml
+              - interface2.yml
+            models:
+              libraries:
+                - models/ldo.spice
+              required_parameters:
+                - V_IN
+                - V_OUT
+        """),
+    )
+    fake_fs.create_file(_INTERFACE_PATH, contents=VALID_INTERFACE_YAML)
+    fake_fs.create_file("/interface2.yml", contents=VALID_INTERFACE_YAML)
+    manifest = load_manifest(_MANIFEST_PATH)
+    assert_that(manifest.interface, equal_to(["interface.yml", "interface2.yml"]))
+
+
+def test_list_interface_missing_one_raises_manifest_validation_error(fake_fs):
+    """A manifest with a list interface where one file is missing raises ManifestValidationError."""
+    fake_fs.create_file(
+        _MANIFEST_PATH,
+        contents=textwrap.dedent("""\
+            name: voltage-regulator
+            version: "1.0.0"
+            schematic: schematic/voltage-regulator.kicad_sch
+            interface:
+              - interface.yml
+              - missing.yml
+            models:
+              libraries:
+                - models/ldo.spice
+              required_parameters:
+                - V_IN
+        """),
+    )
+    fake_fs.create_file(_INTERFACE_PATH, contents=VALID_INTERFACE_YAML)
+    # missing.yml intentionally not created
+    with pytest.raises(ManifestValidationError) as exc_info:
+        load_manifest(_MANIFEST_PATH)
+    message = str(exc_info.value)
+    assert_that(message, contains_string("voltage-regulator"))
+    assert_that(message, contains_string("missing.yml"))
+
+
+def test_single_interface_normalized_to_list(fake_fs):
+    """A single-string interface field is normalised to a one-element list."""
+    fake_fs.create_file(_MANIFEST_PATH, contents=VALID_MANIFEST_YAML)
+    fake_fs.create_file(_INTERFACE_PATH, contents=VALID_INTERFACE_YAML)
+    manifest = load_manifest(_MANIFEST_PATH)
+    assert_that(manifest.interface, equal_to(["interface.yml"]))

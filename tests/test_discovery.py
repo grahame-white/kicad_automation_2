@@ -200,3 +200,22 @@ def test_result_names_match_manifests(fake_fs):
     names = {m.name for m in result}
     assert_that("voltage-regulator" in names, equal_to(True))
     assert_that("current-sensor" in names, equal_to(True))
+
+
+def test_multiple_features_can_implement_same_interface_contract(fake_fs):
+    """Multiple independent features may each satisfy the same interface contract.
+
+    Each feature owns its own copy of the interface.yml inside its own directory
+    subtree (isolation rules prevent sharing files across features).  Both manifests
+    must load successfully even though their interface contracts share the same name
+    and version.
+    """
+    fake_fs.create_file("/repo/voltage-regulator/feature.yml", contents=VALID_MANIFEST_YAML)
+    fake_fs.create_file("/repo/voltage-regulator/interface.yml", contents=VALID_INTERFACE_YAML)
+    fake_fs.create_file("/repo/current-sensor/feature.yml", contents=VALID_MANIFEST_YAML_2)
+    fake_fs.create_file("/repo/current-sensor/interface.yml", contents=VALID_INTERFACE_YAML)
+    result = discover_features("/repo")
+    assert_that(result, has_length(2))
+    names = {m.name for m in result}
+    assert_that("voltage-regulator" in names, equal_to(True))
+    assert_that("current-sensor" in names, equal_to(True))

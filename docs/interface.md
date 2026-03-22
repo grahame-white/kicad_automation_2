@@ -77,26 +77,33 @@ jsonschema.exceptions.ValidationError: 'unknown' is not one of ['input', 'output
 
 ## Feature-to-interface linkage
 
-Every `feature.yml` must declare an `interface` field pointing to a valid `interface.yml`
-within the same feature directory subtree.  When a feature manifest is loaded by
-`ci_feature.manifest.load_manifest`, the referenced interface file is automatically
-resolved and validated.
+Every `feature.yml` must declare an `interface` field pointing to one or more valid
+`interface.yml` files within the same feature directory subtree.  When a feature manifest
+is loaded by `ci_feature.manifest.load_manifest`, every referenced interface file is
+automatically resolved and validated.
+
+An interface contract describes a reusable electrical API.  **Multiple features can each
+implement the same interface contract** — each feature has its own copy of the
+`interface.yml` (isolation rules require all paths to remain inside the feature's own
+directory subtree).  Equally, **a single feature may satisfy multiple interface contracts**
+by listing more than one path in the `interface` field.
 
 ### Rules
 
-1. The `interface` field in `feature.yml` must be a **relative path** to an
-   `interface.yml` file inside the feature's directory subtree.
-2. The referenced `interface.yml` must **exist** at that path.
-3. The referenced `interface.yml` must be **parseable YAML** and must **conform to the
+1. The `interface` field in `feature.yml` must be a **relative path string** or a
+   **non-empty list of relative path strings**, all pointing to `interface.yml` files
+   inside the feature's directory subtree.
+2. Every referenced `interface.yml` must **exist** at its declared path.
+3. Every referenced `interface.yml` must be **parseable YAML** and must **conform to the
    interface JSON Schema** (`ci/schemas/interface.schema.json`).
 
 ### Failure modes
 
 | Condition | Error raised | Error message includes |
 |-----------|-------------|------------------------|
-| `interface.yml` does not exist | `ManifestValidationError` | Feature name + missing path |
-| `interface.yml` is not parseable YAML | `ManifestValidationError` | Feature name + path + YAML error |
-| `interface.yml` fails schema validation | `ManifestValidationError` | Feature name + path + field name |
+| An `interface.yml` does not exist | `ManifestValidationError` | Feature name + missing path |
+| An `interface.yml` is not parseable YAML | `ManifestValidationError` | Feature name + path + YAML error |
+| An `interface.yml` fails schema validation | `ManifestValidationError` | Feature name + path + field name |
 
 Example error when the interface file is missing:
 
@@ -112,7 +119,7 @@ ManifestValidationError: Feature 'voltage-regulator' has invalid interface
 '/path/to/feature/interface.yml': Interface validation failed: 'signals' is a required property
 ```
 
-### Example feature.yml with interface linkage
+### Example feature.yml — single interface
 
 ```yaml
 name: voltage-regulator
@@ -127,7 +134,59 @@ models:
     - V_OUT
 ```
 
-The `interface: interface.yml` entry links this feature to the `interface.yml` file
-in the same directory.  If that file is absent or invalid, loading the manifest will
-fail with a clear error message that names both the feature and the problematic path.
+The `interface: interface.yml` entry links this feature to a single `interface.yml` in
+the same directory.
+
+### Example feature.yml — multiple interfaces
+
+A feature can satisfy more than one interface contract by declaring a list:
+
+```yaml
+name: voltage-regulator
+version: "1.0.0"
+schematic: schematic/voltage-regulator.kicad_sch
+interface:
+  - interface.yml
+  - thermal-interface.yml
+models:
+  libraries:
+    - models/ldo.spice
+  required_parameters:
+    - V_IN
+    - V_OUT
+```
+
+Both `interface.yml` and `thermal-interface.yml` must exist in the feature directory and
+pass schema validation.  The `FeatureManifest.interface` attribute is always a list of
+strings — even when a single string is declared in `feature.yml`, it is normalised to a
+one-element list.
+
+### Multiple features implementing the same interface
+
+The most common relationship is **many-to-one**: several independent features each provide
+their own implementation of the same interface contract.  Because isolation rules require
+every path to remain inside the feature's own directory subtree, each feature owns a copy
+of the `interface.yml` that describes the contract it satisfies.  The CI system validates
+each copy independently.
+
+Example — two features each implementing the `dc-power-supply` contract:
+
+```
+features/
+  voltage-regulator/
+    feature.yml          # interface: interface.yml
+    interface.yml        # name: dc-power-supply, version: "1.0.0", signals: [...]
+    schematic/...
+    models/...
+  switched-mode-psu/
+    feature.yml          # interface: interface.yml
+    interface.yml        # name: dc-power-supply, version: "1.0.0", signals: [...]
+    schematic/...
+    models/...
+```
+
+Both `voltage-regulator/interface.yml` and `switched-mode-psu/interface.yml` describe the
+same `dc-power-supply` contract.  There is no shared file — each feature is fully
+self-contained.  CI validates each independently and will fail if either copy becomes
+malformed or goes missing.
 

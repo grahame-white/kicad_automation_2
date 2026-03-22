@@ -237,3 +237,19 @@ def test_load_manifest_raises_for_dotdot_path(fake_fs):
     with pytest.raises(IsolationViolationError) as exc_info:
         load_manifest(_MANIFEST_PATH)
     assert_that(str(exc_info.value), contains_string("../../shared/my-feature.kicad_sch"))
+
+
+def test_list_interface_absolute_path_fails():
+    """validate_isolation() raises IsolationViolationError for an absolute path in a list."""
+    data = {**VALID_MANIFEST_DATA, "interface": ["/absolute/interface.yml"]}
+    with pytest.raises(IsolationViolationError) as exc_info:
+        validate_isolation(_FEATURE_DIR, data)
+    assert_that(str(exc_info.value), contains_string("/absolute/interface.yml"))
+
+
+def test_list_interface_dotdot_path_fails():
+    """validate_isolation() raises IsolationViolationError for a ../ path in a list interface."""
+    data = {**VALID_MANIFEST_DATA, "interface": ["../../shared/interface.yml"]}
+    with pytest.raises(IsolationViolationError) as exc_info:
+        validate_isolation(_FEATURE_DIR, data)
+    assert_that(str(exc_info.value), contains_string("../../shared/interface.yml"))
