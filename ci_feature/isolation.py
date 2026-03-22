@@ -56,9 +56,17 @@ def validate_isolation(feature_dir: str, manifest_data: Dict[str, Any]) -> None:
                 f"Use a relative path instead of an absolute path."
             )
 
-        resolved = os.path.normpath(os.path.join(feature_dir_real, path))
-        rel = os.path.relpath(resolved, feature_dir_real)
-        if rel.startswith(".."):
+        # Resolve the path relative to the feature directory, following symlinks,
+        # and ensure the resulting real path is still within the feature subtree.
+        resolved = os.path.realpath(os.path.join(feature_dir_real, path))
+        try:
+            common = os.path.commonpath([feature_dir_real, resolved])
+        except ValueError:
+            # On some platforms, paths on different drives cause ValueError; treat
+            # these as violations of the isolation boundary.
+            common = None
+
+        if common != feature_dir_real:
             raise IsolationViolationError(
                 f"'{field}' path '{path}' resolves outside the feature directory "
                 f"'{feature_dir_real}'. All paths in feature.yml must be contained "
