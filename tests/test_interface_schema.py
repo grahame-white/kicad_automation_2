@@ -7,7 +7,7 @@ import textwrap
 import jsonschema
 import pytest
 import yaml
-from hamcrest import assert_that, contains_string, equal_to
+from hamcrest import assert_that, contains_string, equal_to, has_length
 
 # Resolved absolute path to the schema file.
 _SCHEMA_PATH = os.path.realpath(
@@ -55,7 +55,7 @@ def test_valid_interface_passes(schema):
     """A fully-populated valid interface.yml passes validation without error."""
     data = _validate(schema, VALID_INTERFACE_YAML)
     assert_that(data["name"], equal_to("dc-power-supply"))
-    assert len(data["signals"]) == 2
+    assert_that(data["signals"], has_length(2))
 
 
 def test_missing_signals_fails(schema):
@@ -168,3 +168,41 @@ def test_invalid_version_format_fails(schema):
     with pytest.raises(jsonschema.ValidationError) as exc_info:
         jsonschema.validate(instance=data, schema=schema)
     assert_that(str(exc_info.value), contains_string("version"))
+
+
+def test_extra_top_level_property_fails(schema):
+    """An interface.yml with an unknown top-level key fails validation."""
+    yaml_text = textwrap.dedent("""\
+        name: dc-power-supply
+        version: "1.0.0"
+        unknown_field: not-allowed
+        signals:
+          - name: V_OUT
+            direction: output
+            domain: analog
+            unit: V
+            description: Output voltage
+    """)
+    data = yaml.safe_load(yaml_text)
+    with pytest.raises(jsonschema.ValidationError) as exc_info:
+        jsonschema.validate(instance=data, schema=schema)
+    assert_that(str(exc_info.value), contains_string("unknown_field"))
+
+
+def test_extra_signal_property_fails(schema):
+    """A signal entry with an unknown extra key fails validation."""
+    yaml_text = textwrap.dedent("""\
+        name: dc-power-supply
+        version: "1.0.0"
+        signals:
+          - name: V_OUT
+            direction: output
+            domain: analog
+            unit: V
+            description: Output voltage
+            extra_key: not-allowed
+    """)
+    data = yaml.safe_load(yaml_text)
+    with pytest.raises(jsonschema.ValidationError) as exc_info:
+        jsonschema.validate(instance=data, schema=schema)
+    assert_that(str(exc_info.value), contains_string("extra_key"))
