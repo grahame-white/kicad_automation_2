@@ -97,6 +97,69 @@ except ManifestValidationError as exc:
     print(f"Invalid manifest: {exc}")
 ```
 
+## Model library rules
+
+Every path listed under `models.libraries` must exist on the filesystem before ngspice is
+invoked. Pass the manifest and its directory to `run_spice()` to enforce this automatically,
+or call `ci_feature.model_validation.validate_model_presence()` directly as a pre-flight check.
+
+### Behaviour
+
+- All paths in `models.libraries` are resolved **relative to the feature directory** (the
+  directory containing `feature.yml`).
+- If every path resolves to an existing file, validation passes silently.
+- If one or more paths are missing, a `MissingModelError` is raised **before** ngspice is
+  started. The error message includes:
+  - The feature name.
+  - The full absolute path of every missing file.
+
+### Enforcement via `run_spice()`
+
+When `manifest` and `feature_dir` are supplied to `run_spice()`, the pre-flight check runs
+automatically before the ngspice subprocess is launched:
+
+```python
+from ci_feature.manifest import load_manifest
+from ci_feature.spice_runner import run_spice
+from ci_feature.spice_errors import MissingModelError
+import os
+
+manifest = load_manifest("path/to/feature.yml")
+feature_dir = os.path.dirname(os.path.realpath("path/to/feature.yml"))
+
+# validate_model_presence is called automatically before ngspice starts
+result = run_spice("path/to/netlist.spice", "path/to/output", manifest=manifest, feature_dir=feature_dir)
+```
+
+### Standalone enforcement
+
+`validate_model_presence()` can also be called directly:
+
+```python
+from ci_feature.manifest import load_manifest
+from ci_feature.model_validation import validate_model_presence
+from ci_feature.spice_errors import MissingModelError
+import os
+
+manifest = load_manifest("path/to/feature.yml")
+feature_dir = os.path.dirname(os.path.realpath("path/to/feature.yml"))
+
+try:
+    validate_model_presence(manifest, feature_dir)
+except MissingModelError as exc:
+    print(f"Pre-flight check failed: {exc}")
+```
+
+### Error format
+
+When model files are missing, the error message follows this pattern:
+
+```
+Feature '<name>' is missing <n> model file[s]:
+  /absolute/path/to/first/missing.spice
+  /absolute/path/to/second/missing.spice
+```
+
 ## Low-level validation
 
 You can also validate a manifest dict directly against the JSON Schema at

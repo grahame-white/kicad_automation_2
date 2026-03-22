@@ -4,11 +4,14 @@ import os
 import shutil
 import subprocess
 import tempfile
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
 from unittest.mock import MagicMock, patch
 
 import pytest
 from hamcrest import assert_that, contains_string, equal_to, instance_of
 
+from ci_feature.spice_errors import MissingModelError
 from ci_feature.spice_runner import SpiceResult, SpiceRunError, run_spice
 
 _NETLIST_PATH = "/tmp/ci/fixtures/minimal.spice"
@@ -355,6 +358,116 @@ def test_run_spice_timeout_includes_partial_stderr(fs):
             run_spice(_NETLIST_PATH, _OUTPUT_DIR)
 
     assert_that(str(exc_info.value), contains_string("partial stderr text"))
+
+
+# ---------------------------------------------------------------------------
+# Pre-flight model presence check via manifest parameter
+# ---------------------------------------------------------------------------
+
+_FEATURE_DIR = "/tmp/ci/features/my-feature"
+
+
+@dataclass
+class _FakeManifest:
+    """Minimal stand-in for FeatureManifest used in spice_runner pre-flight tests."""
+
+    name: str
+    models: Dict[str, Any]
+    version: str = "1.0.0"
+    schematic: str = "schematic/test.kicad_sch"
+    interface: Optional[List[str]] = None
+    configuration: Optional[Dict[str, Any]] = None
+
+    def __post_init__(self):
+        if self.interface is None:
+            self.interface = ["interface.yml"]
+
+
+def test_run_spice_with_manifest_validates_model_presence(fs):
+    """run_spice() calls validate_model_presence before launching ngspice when manifest provided."""
+    fs.create_file(_NETLIST_PATH, contents="* netlist\n.end\n")
+    fs.create_dir(_FEATURE_DIR)
+    manifest = _FakeManifest(
+        name="my-feature",
+        models={"libraries": ["models/missing.spice"], "required_parameters": []},
+    )
+
+    with pytest.raises(MissingModelError):
+        run_spice(_NETLIST_PATH, _OUTPUT_DIR, manifest=manifest, feature_dir=_FEATURE_DIR)
+
+
+def test_run_spice_with_manifest_raises_before_subprocess_when_model_missing(fs):
+    """run_spice() raises MissingModelError without calling subprocess when a model is absent."""
+    fs.create_file(_NETLIST_PATH, contents="* netlist\n.end\n")
+    fs.create_dir(_FEATURE_DIR)
+    manifest = _FakeManifest(
+        name="my-feature",
+        models={"libraries": ["models/absent.spice"], "required_parameters": []},
+    )
+
+    with patch("ci_feature.spice_runner.subprocess.run") as mock_run:
+        with pytest.raises(MissingModelError):
+            run_spice(_NETLIST_PATH, _OUTPUT_DIR, manifest=manifest, feature_dir=_FEATURE_DIR)
+
+    mock_run.assert_not_called()
+
+
+def test_run_spice_with_manifest_proceeds_when_all_models_present(fs):
+    """run_spice() launches ngspice normally when manifest is provided and all models exist."""
+    fs.create_file(_NETLIST_PATH, contents="* netlist\n.end\n")
+    fs.create_file(f"{_FEATURE_DIR}/models/ldo.spice", contents="* ldo model\n")
+    manifest = _FakeManifest(
+        name="my-feature",
+        models={"libraries": ["models/ldo.spice"], "required_parameters": []},
+    )
+
+    with patch(
+        "ci_feature.spice_runner.subprocess.run",
+        return_value=_make_completed_process(returncode=0),
+    ):
+        result = run_spice(_NETLIST_PATH, _OUTPUT_DIR, manifest=manifest, feature_dir=_FEATURE_DIR)
+
+    assert_that(result, instance_of(SpiceResult))
+
+
+def test_run_spice_without_manifest_skips_model_validation(fs):
+    """run_spice() does not perform model validation when no manifest is provided."""
+    fs.create_file(_NETLIST_PATH, contents="* netlist\n.end\n")
+
+    with patch(
+        "ci_feature.spice_runner.subprocess.run",
+        return_value=_make_completed_process(returncode=0),
+    ):
+        result = run_spice(_NETLIST_PATH, _OUTPUT_DIR)
+
+    assert_that(result, instance_of(SpiceResult))
+
+
+def test_run_spice_missing_model_error_includes_feature_name(fs):
+    """MissingModelError from run_spice pre-flight includes the feature name."""
+    fs.create_file(_NETLIST_PATH, contents="* netlist\n.end\n")
+    fs.create_dir(_FEATURE_DIR)
+    manifest = _FakeManifest(
+        name="voltage-regulator",
+        models={"libraries": ["models/missing.spice"], "required_parameters": []},
+    )
+
+    with pytest.raises(MissingModelError) as exc_info:
+        run_spice(_NETLIST_PATH, _OUTPUT_DIR, manifest=manifest, feature_dir=_FEATURE_DIR)
+
+    assert_that(str(exc_info.value), contains_string("voltage-regulator"))
+
+
+def test_run_spice_raises_value_error_when_manifest_provided_without_feature_dir(fs):
+    """run_spice() raises ValueError when manifest is given but feature_dir is omitted."""
+    fs.create_file(_NETLIST_PATH, contents="* netlist\n.end\n")
+    manifest = _FakeManifest(
+        name="my-feature",
+        models={"libraries": ["models/ldo.spice"], "required_parameters": []},
+    )
+
+    with pytest.raises(ValueError, match="feature_dir"):
+        run_spice(_NETLIST_PATH, _OUTPUT_DIR, manifest=manifest)
 
 
 # ---------------------------------------------------------------------------
