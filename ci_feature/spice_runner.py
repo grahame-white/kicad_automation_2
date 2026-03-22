@@ -5,6 +5,7 @@ import shlex
 import subprocess
 from dataclasses import dataclass
 
+from ci_feature.model_validation import validate_model_presence
 from ci_feature.spice_errors import (
     ConvergenceError,
     MissingModelError,
@@ -19,6 +20,7 @@ __all__ = [
     "SpiceSyntaxError",
     "SpiceResult",
     "run_spice",
+    "validate_model_presence",
 ]
 
 

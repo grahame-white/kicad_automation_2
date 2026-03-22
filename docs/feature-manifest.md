@@ -97,6 +97,49 @@ except ManifestValidationError as exc:
     print(f"Invalid manifest: {exc}")
 ```
 
+## Model library rules
+
+Every path listed under `models.libraries` must exist on the filesystem before ngspice is
+invoked. CI enforces this rule by calling
+`ci_feature.model_validation.validate_model_presence()` as a pre-flight check.
+
+### Behaviour
+
+- All paths in `models.libraries` are resolved **relative to the feature directory** (the
+  directory containing `feature.yml`).
+- If every path resolves to an existing file, validation passes silently.
+- If one or more paths are missing, a `MissingModelError` is raised **before** ngspice is
+  started. The error message includes:
+  - The feature name.
+  - The full absolute path of every missing file.
+
+### Example
+
+```python
+from ci_feature.manifest import load_manifest
+from ci_feature.model_validation import validate_model_presence
+from ci_feature.spice_errors import MissingModelError
+import os
+
+manifest = load_manifest("path/to/feature.yml")
+feature_dir = os.path.dirname(os.path.realpath("path/to/feature.yml"))
+
+try:
+    validate_model_presence(manifest, feature_dir)
+except MissingModelError as exc:
+    print(f"Pre-flight check failed: {exc}")
+```
+
+### Error format
+
+When model files are missing, the error message follows this pattern:
+
+```
+Feature '<name>' is missing <n> model file[s]:
+  /absolute/path/to/first/missing.spice
+  /absolute/path/to/second/missing.spice
+```
+
 ## Low-level validation
 
 You can also validate a manifest dict directly against the JSON Schema at
