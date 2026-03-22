@@ -91,11 +91,11 @@ by listing more than one path in the `interface` field.
 ### Rules
 
 1. The `interface` field in `feature.yml` must be a **relative path string** or a
-   **non-empty list of relative path strings**, all pointing to `interface.yml` files
-   inside the feature's directory subtree.
-2. Every referenced `interface.yml` must **exist** at its declared path.
-3. Every referenced `interface.yml` must be **parseable YAML** and must **conform to the
-   interface JSON Schema** (`ci/schemas/interface.schema.json`).
+   **non-empty list of relative path strings**, all pointing to interface contract YAML
+   files (conforming to the interface schema) inside the feature's directory subtree.
+2. Every referenced interface contract YAML file must **exist** at its declared path.
+3. Every referenced interface contract YAML file must be **parseable YAML** and must
+   **conform to the interface JSON Schema** (`ci/schemas/interface.schema.json`).
 
 ### Failure modes
 

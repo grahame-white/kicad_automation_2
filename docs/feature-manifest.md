@@ -13,7 +13,7 @@ The manifest is validated against the JSON Schema at [`ci/schemas/feature.schema
 | `name` | string | Unique feature identifier. |
 | `version` | string | Semantic version (e.g. `"1.0.0"`). |
 | `schematic` | string | Relative path to the KiCad schematic file. |
-| `interface` | string or array of strings | Relative path(s) to `interface.yml` file(s). Use a list when the feature satisfies multiple interface contracts. |
+| `interface` | string or array of strings | Relative path(s) to interface contract YAML file(s) (often named `interface.yml`). Use a list when the feature satisfies multiple interface contracts. |
 | `models.libraries` | array of strings | Relative paths to SPICE model files. |
 | `models.required_parameters` | array of strings | Parameter names that must be supplied at runtime. |
 

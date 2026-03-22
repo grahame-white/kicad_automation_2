@@ -253,3 +253,11 @@ def test_list_interface_dotdot_path_fails():
     with pytest.raises(IsolationViolationError) as exc_info:
         validate_isolation(_FEATURE_DIR, data)
     assert_that(str(exc_info.value), contains_string("../../shared/interface.yml"))
+
+
+def test_list_interface_non_string_entry_fails():
+    """validate_isolation() raises IsolationViolationError for a non-string item in a list."""
+    data = {**VALID_MANIFEST_DATA, "interface": [42]}
+    with pytest.raises(IsolationViolationError) as exc_info:
+        validate_isolation(_FEATURE_DIR, data)
+    assert_that(str(exc_info.value), contains_string("interface[0]"))
