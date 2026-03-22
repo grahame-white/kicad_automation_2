@@ -13,6 +13,7 @@ from ci_feature.spice_errors import (
     MissingModelError,
     MissingParameterError,
     SpiceRunError,
+    SpiceSyntaxError,
 )
 from ci_feature.spice_runner import SpiceResult
 from features.steps.feature_steps import step_simulation_is_run
@@ -173,9 +174,10 @@ class TestSimulationStepSuccess:
         call_kwargs = mock_run_spice.call_args
         assert_that(call_kwargs.kwargs["provided_params"], is_(None))
 
-    def test_step_uses_dot_as_feature_dir_when_context_feature_dir_is_none(self):
-        """step_simulation_is_run uses '.' as feature_dir when context.feature_dir is None."""
+    def test_step_uses_manifest_directory_when_context_feature_dir_is_none(self):
+        """Falls back to manifest.directory as feature_dir when context.feature_dir is None."""
         manifest = _make_manifest("voltage-regulator")
+        # manifest.directory is set to "/repo/schematics/voltage-regulator" by _make_manifest
         context = _make_context(manifest=manifest, feature_dir=None)
 
         with (
@@ -187,7 +189,9 @@ class TestSimulationStepSuccess:
             step_simulation_is_run(context)
 
         call_kwargs = mock_run_spice.call_args
-        assert_that(call_kwargs.kwargs["feature_dir"], equal_to("."))
+        assert_that(
+            call_kwargs.kwargs["feature_dir"], equal_to("/repo/schematics/voltage-regulator")
+        )
 
     def test_step_output_dir_is_under_feature_root_reports(self):
         """step_simulation_is_run places simulation output under feature_root/reports/simulation."""
@@ -228,6 +232,24 @@ class TestSimulationStepNoManifest:
             step_simulation_is_run(context)
 
         assert_that(str(exc_info.value), contains_string("Given the feature"))
+
+    def test_step_raises_assertion_error_when_feature_dir_unavailable(self):
+        """step_simulation_is_run raises AssertionError when neither context.feature_dir
+        nor manifest.directory provides a feature directory."""
+        manifest = FeatureManifest(
+            name="voltage-regulator",
+            version="1.0.0",
+            schematic="schematic/voltage-regulator.kicad_sch",
+            interface=["interface.yml"],
+            models={"libraries": [], "required_parameters": []},
+            directory=None,
+        )
+        context = _make_context(manifest=manifest, feature_dir=None)
+
+        with pytest.raises(AssertionError) as exc_info:
+            step_simulation_is_run(context)
+
+        assert_that(str(exc_info.value), contains_string("Feature directory is not available"))
 
 
 class TestSimulationStepExportFailure:
@@ -352,3 +374,20 @@ class TestSimulationStepSpiceFailures:
                 step_simulation_is_run(context)
 
         assert_that(context.simulation_result, is_(None))
+
+    def test_step_propagates_spice_syntax_error(self):
+        """step_simulation_is_run propagates SpiceSyntaxError from run_spice."""
+        manifest = _make_manifest("voltage-regulator")
+        context = _make_context(manifest=manifest, feature_dir="/repo/schematics/voltage-regulator")
+
+        with (
+            patch("features.steps.feature_steps.export_netlist", return_value="/some/netlist.net"),
+            patch(
+                "features.steps.feature_steps.run_spice",
+                side_effect=SpiceSyntaxError("parse error in netlist"),
+            ),
+        ):
+            with pytest.raises(SpiceSyntaxError) as exc_info:
+                step_simulation_is_run(context)
+
+        assert_that(str(exc_info.value), contains_string("parse error in netlist"))

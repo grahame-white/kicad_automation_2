@@ -64,6 +64,8 @@ def step_simulation_is_run(context):
             declared in the manifest are absent from the feature configuration.
         SpiceRunError: When ngspice cannot be launched, times out, or exits
             with a non-zero status not matched by a more specific error class.
+        SpiceSyntaxError: When ngspice reports a syntax or parse error in the
+            netlist or included SPICE sources.
         ConvergenceError: When ngspice reports a convergence failure.
     """
     manifest = context.feature_manifest
@@ -72,15 +74,20 @@ def step_simulation_is_run(context):
             "No feature manifest loaded. Use 'Given the feature \"<name>\"' first."
         )
 
-    feature_dir = context.feature_dir or "."
+    feature_dir = getattr(context, "feature_dir", None) or getattr(manifest, "directory", None)
+    if not feature_dir:
+        raise AssertionError(
+            "Feature directory is not available. Ensure the manifest discovery step "
+            "has set either context.feature_dir or manifest.directory."
+        )
+
     output_dir = os.path.join(context.feature_root, "reports", "simulation")
 
     netlist_path = export_netlist(manifest, output_dir, feature_dir)
 
-    feature_output_dir = os.path.join(output_dir, manifest.name)
     context.simulation_result = run_spice(
         netlist_path=netlist_path,
-        output_dir=feature_output_dir,
+        output_dir=os.path.dirname(netlist_path),
         manifest=manifest,
         feature_dir=feature_dir,
         provided_params=manifest.configuration,

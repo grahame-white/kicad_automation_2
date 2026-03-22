@@ -160,7 +160,7 @@ by the preceding `Given the feature "<name>"` step.  It:
 
 1. Exports the KiCad netlist using `kicad-cli` via `export_netlist()` from `ci_feature/kicad_export.py`.
 2. Runs `ngspice` in batch mode on the exported netlist via `run_spice()` from `ci_feature/spice_runner.py`.
-3. Stores the :class:`SpiceResult` on `context.simulation_result` for use in subsequent `Then` assertion steps.
+3. Stores the `SpiceResult` on `context.simulation_result` for use in subsequent `Then` assertion steps.
 
 ```gherkin
 Feature: Voltage regulator simulation
@@ -187,6 +187,7 @@ message is immediately actionable:
 | Missing SPICE model file | `MissingModelError` | Model library path in manifest does not exist |
 | Missing required parameter | `MissingParameterError` | Parameter listed in `models.required_parameters` absent from `configuration` |
 | ngspice convergence failure | `ConvergenceError` | Simulation did not converge |
+| ngspice syntax/parse error | `SpiceSyntaxError` | ngspice reported a SPICE netlist parse/syntax error |
 | Other ngspice failure | `SpiceRunError` | ngspice exited with a non-zero status |
 
 ### Model and parameter pre-flight checks
