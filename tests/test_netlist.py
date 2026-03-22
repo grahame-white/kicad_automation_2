@@ -4,9 +4,10 @@ import os
 import subprocess
 from unittest.mock import MagicMock, patch
 
-from hamcrest import assert_that, equal_to
+import pytest
+from hamcrest import assert_that, contains_string, equal_to
 
-from ci_feature.kicad_export import export_netlist
+from ci_feature.kicad_export import NetlistExportError, export_netlist
 from ci_feature.manifest import FeatureManifest
 from ci_feature.netlist import normalize_netlist
 
@@ -84,3 +85,38 @@ def test_export_netlist_calls_normalize_netlist(fs):
             export_netlist(manifest, output_dir, feature_dir=feature_dir)
 
     mock_normalize.assert_called_once_with(expected_netlist, expected_netlist)
+
+
+def test_export_netlist_wraps_normalize_error_as_netlist_export_error(fs):
+    """export_netlist() wraps OSError from normalize_netlist() as NetlistExportError."""
+    manifest = FeatureManifest(
+        name="voltage-regulator",
+        version="1.0.0",
+        schematic="schematic/voltage-regulator.kicad_sch",
+        interface=["interface.yml"],
+        models={"libraries": [], "required_parameters": []},
+    )
+    feature_dir = "/repo/features/voltage-regulator"
+    output_dir = "/tmp/ci_workspace"
+    expected_netlist = f"{output_dir}/voltage-regulator/voltage-regulator.net"
+
+    fs.create_dir(feature_dir)
+
+    def fake_run(cmd, **kwargs):
+        fs.create_file(expected_netlist, contents="(nets)")
+        result = MagicMock(spec=subprocess.CompletedProcess)
+        result.returncode = 0
+        result.stdout = ""
+        result.stderr = ""
+        return result
+
+    with patch("ci_feature.kicad_export.subprocess.run", side_effect=fake_run):
+        with patch(
+            "ci_feature.kicad_export.normalize_netlist",
+            side_effect=OSError("disk full"),
+        ):
+            with pytest.raises(NetlistExportError) as exc_info:
+                export_netlist(manifest, output_dir, feature_dir=feature_dir)
+
+    assert_that(str(exc_info.value), contains_string("voltage-regulator"))
+    assert_that(str(exc_info.value), contains_string("disk full"))
