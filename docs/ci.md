@@ -174,6 +174,81 @@ netlist_path = export_netlist(manifest, output_dir="/tmp/ci_workspace", feature_
 - If the expected output file is missing or empty after a successful `kicad-cli`
   run, a `NetlistExportError` is raised with the expected file path.
 
+## Parallel execution / matrix sharding
+
+The CI pipeline runs each feature's BDD scenarios as a separate parallel job using a GitHub
+Actions matrix strategy.  This scales execution time roughly linearly with the number of
+available runners rather than the number of features.
+
+### How it works
+
+1. **`generate-matrix`** — runs immediately after `fast-check`.  It executes
+   `python ci/generate_matrix.py`, which calls `discover_features()` and outputs a JSON array
+   of feature directory paths relative to the repository root (for example
+   `["features/voltage-regulator", "features/current-sensor"]`).  The array is captured in a
+   job output called `matrix`.
+
+2. **`run-feature`** — fans out over the matrix produced by `generate-matrix`.  One runner is
+   allocated per feature directory.  Each runner:
+   - Checks out the repository.
+   - Installs the full toolchain and Python dependencies via the shared `ci-setup` action.
+   - Runs `behave <feature-dir>/` to execute only the scenarios belonging to that shard.
+   - Uploads the JUnit XML files from `reports/junit/` as a per-shard artifact named
+     `junit-<job-index>` (uploaded even when the step fails, via `if: always()`).
+
+3. **Failure propagation** — `strategy.fail-fast` is set to `false` so that all shards run to
+   completion even when one fails, giving a full picture of the test results.  Because each
+   shard is its own job, GitHub marks the overall workflow run as failed if *any* shard fails.
+
+### `ci/generate_matrix.py`
+
+The `generate_matrix(root_path)` function in `ci/generate_matrix.py` can also be imported
+directly in Python:
+
+```python
+from ci.generate_matrix import generate_matrix
+
+paths = generate_matrix(root_path="/repo")
+# Returns: ["features/voltage-regulator", ...] sorted alphabetically
+```
+
+When run as a script it prints the JSON array to stdout:
+
+```bash
+python ci/generate_matrix.py
+# ["features/current-sensor", "features/voltage-regulator"]
+```
+
+An optional positional argument overrides the default repository root (the parent directory of
+the script):
+
+```bash
+python ci/generate_matrix.py /path/to/repo
+```
+
+### Per-shard JUnit reports
+
+Each `run-feature` job uploads its JUnit XML files as a separate artifact.  Artifact names
+follow the pattern `junit-<job-index>` where `<job-index>` is the zero-based position of the
+shard within the matrix (provided by `strategy.job-index`).
+
+To download and inspect the reports:
+
+1. Open the **Actions** tab of the repository on GitHub.
+2. Select the workflow run of interest.
+3. Scroll to the **Artifacts** section.
+4. Download the `junit-<N>` artifact for the shard you want to inspect.
+5. Extract the ZIP and open the XML files in any JUnit-compatible viewer.
+
+### Design decisions
+
+- **`fail-fast: false`** — ensures all shards run to completion so you get the full failure
+  picture in one workflow run rather than having to re-run after fixing each shard in turn.
+- **`if: ${{ needs.generate-matrix.outputs.matrix != '[]' }}`** — skips the `run-feature` job
+  entirely when no features are discovered, avoiding a matrix-with-empty-array error.
+- **Artifact naming** — uses `strategy.job-index` rather than the feature path to avoid
+  artifact-name collisions caused by special characters in directory paths.
+
 ## Behavioural test reports
 
 After the **Run BDD scenarios** step completes (whether it passes or fails), the CI pipeline uploads the contents of the `reports/` directory as a downloadable artifact named **`behave-reports`**.
