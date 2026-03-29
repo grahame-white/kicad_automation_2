@@ -5,4 +5,4 @@ pyfakefs==6.1.6
 PyHamcrest==2.1.0
 PyYAML==6.0.2
 pytest==9.0.2
-ruff==0.15.7
+ruff==0.15.8
