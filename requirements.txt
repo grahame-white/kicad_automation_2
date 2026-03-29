@@ -3,6 +3,6 @@ behave-html-formatter==0.9.10
 jsonschema==4.23.0
 pyfakefs==6.1.6
 PyHamcrest==2.1.0
-PyYAML==6.0.2
+PyYAML==6.0.3
 pytest==9.0.2
 ruff==0.15.7
